@@ -1,0 +1,46 @@
+
+**/.terraform/*
+
+*.tfstate
+*.tfstate.*
+
+
+crash.log
+crash.*.log
+
+*.tfvars
+*.tfvars.json
+
+
+*.tfplan
+
+# ------------------------------------------------------
+# AWS Lambda Payloads
+# ------------------------------------------------------
+# Ignore the zip files we create for Lambda deployments
+*.zip
+
+# ------------------------------------------------------
+# Node.js (Your current Lambda runtime)
+# ------------------------------------------------------
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ------------------------------------------------------
+# Python (In case you switch back)
+# ------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.venv/
+
+# ------------------------------------------------------
+# OS & IDE Files
+# ------------------------------------------------------
+.DS_Store
+.vscode/
+.idea/
+*.swp
