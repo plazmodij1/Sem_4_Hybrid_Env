@@ -101,3 +101,19 @@ data "aws_iam_policy_document" "backend_teardown_policy" {
     resources = ["arn:aws:elasticloadbalancing:eu-central-1:*:targetgroup/tg-*/*"]
   }
 }
+
+## OpenVPN Access Server AMI datablock
+data "aws_ami" "ovpn_ami" {
+    most_recent = true
+    owners = ["aws-marketplace"]
+
+    filter {
+        name   = "product-code"
+        values = ["f2ew2wrz425a1jagnifd02u5t"]
+    }
+
+    tags = {
+        Name = "ovpn_ami"
+        Description = "Most recent OpenVPN Access Server ami."
+    }
+}
