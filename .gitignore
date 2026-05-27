@@ -1,0 +1,5 @@
+## Terraform ignore
+terraform/environments/dev/infrastructure/.terraform
+terraform/environments/dev/infrastructure/.terraform.lock.hcl
+terraform/environments/dev/infrastructure/terraform.tfstate
+terraform/environments/dev/infrastructure/terraform.tfstate.backup
