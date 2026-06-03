@@ -63,3 +63,21 @@ resource "aws_dynamodb_table" "terraform_lock" {
 resource "aws_route53_zone" "fontys_zone" {
   name = "fontys-proftask.lat"
 }
+
+# S3 bucket for container config files
+resource "aws_s3_bucket" "master_config_bucket" {
+  bucket = "fontys-terraform-state-bucket-config"
+  
+  tags = {
+    Name        = "Master-Config-Bucket"
+    Environment = "Production"
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "config_bucket_security" {
+  bucket                  = aws_s3_bucket.master_config_bucket.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
