@@ -1,4 +1,4 @@
-resource "aws_ecs_cluster" "hybrid_cluster" {
+resource "aws_ecs_cluster" "main" {
     name = "hybrid-compute-cluster"
 }
 
@@ -42,4 +42,48 @@ resource "aws_ecs_task_definition" "apache_template" {
 resource "aws_cloudwatch_log_group" "apache_logs" {
   name              = "/ecs/apache-web"
   retention_in_days = 7
+}
+
+resource "aws_ecs_task_definition" "backend_task" {
+  family                    = "fastapi-backend"
+  network_mode              = "awsvpc"
+  requires_compatibilities  = ["FARGATE"]
+  cpu                       = "256"
+  memory                    = "512"
+  execution_role_arn            = aws_iam_role.ecs_task_execution.arn
+
+  container_definitions = jsonencode([{
+    name        = "fastapi-backend-container"
+    image       = "temp"
+    essential   = true
+    portMappings = [{
+        containerPort   = 8000
+        hostPort        = 8000
+        protocol        = "tcp"
+    }]
+    environment = [
+      { name = "PFSENSE_IP", value = "145.220.75.91" },
+      { name = "TRAEFIK_PORT", value = "3055" },
+      { name = "REPO_OWNER", value = "plazmodij1" },
+      { name = "REPO_NAME", value = "Sem_4_Hybrid_Env" }
+    ]
+    secrets = [{
+      name = "GITHUB_TOKEN"
+      valueFrom = "arn:aws:ssm:eu-central-1:027053845110:parameter/hybrid-cloud/github-token" #CHANGE THE ACCOUNT ID
+    }]
+  }])
+}
+
+resource "aws_ecs_service" "backend_service" {
+    name = "backend-service"
+    cluster = aws_ecs_cluster.main.id
+    task_definition = aws_ecs_task_definition.backend_task.arn
+    desired_count = 1
+    launch_type = "FARGATE"
+
+    network_configuration {
+      subnets = [aws_subnet.private["app"].id]
+      security_groups = [aws_security.ecs.id]
+      assign_public_ip = false
+    }
 }

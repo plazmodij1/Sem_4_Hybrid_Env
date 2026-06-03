@@ -26,7 +26,7 @@ resource "aws_security_group" "alb_sg" {
 }
 
 # Security group for the Lambda function allowing outbound traffic to the backend services
-resource "aws_security_group" "lambda" {
+resource "aws_security_group" "ecs" {
   name   = "lambda-sg"
   vpc_id = aws_vpc.private.id
 

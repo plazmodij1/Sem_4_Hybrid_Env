@@ -72,3 +72,9 @@ resource "aws_ecr_repository" "httpd_repo" {
   image_tag_mutability = "MUTABLE"
   force_delete         = true # Makes it easier to clean up later
 }
+
+resource "aws_ecr_repository" "fastapi_backend" {
+  name                 = "fastapi-backend"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true # Makes it easier to clean up later
+}
