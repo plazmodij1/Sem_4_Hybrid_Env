@@ -3,10 +3,13 @@
 ########################################## THIS FILE IS ONLY FOR FIRST TIME DEPLOYMENT. ########################################## 
 ##################################################################################################################################
 
+provider "aws" {
+  region = "eu-central-1"
+}
 
 # S3 BUCKET FOR TERRAFORM STATE
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "fontys-terraform-state-bucket"
+  bucket = "fontys-marko-terraform-state-bucket"
 
   tags = {
     Name        = "Terraform State Bucket"
@@ -62,4 +65,10 @@ resource "aws_dynamodb_table" "terraform_lock" {
 
 resource "aws_route53_zone" "fontys_zone" {
   name = "fontys-proftask.lat"
+}
+
+resource "aws_ecr_repository" "httpd_repo" {
+  name                 = "httpd-repo"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true # Makes it easier to clean up later
 }

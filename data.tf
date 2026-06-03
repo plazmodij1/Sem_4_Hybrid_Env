@@ -7,3 +7,7 @@ data "archive_file" "lambda_zip" {
 data "aws_route53_zone" "fontys_zone" {
   name = "fontys-proftask.lat"
 }
+
+data "aws_s3_bucket" "main" {
+  bucket = "fontys-marko-terraform-state-bucket"
+}
