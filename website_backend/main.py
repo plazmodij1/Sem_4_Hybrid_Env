@@ -5,6 +5,7 @@ import os
 import json
 import base64
 import requests
+import boto3
 from datetime import datetime
 
 app = FastAPI(title="Hybrid Cloud Deployment Engine")
@@ -13,20 +14,13 @@ app = FastAPI(title="Hybrid Cloud Deployment Engine")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_OWNER = os.getenv("REPO_OWNER")
 REPO_NAME = os.getenv("REPO_NAME")
-PFSENSE_IP = os.getenv("PFSENSE_IP", "127.0.0.1") # Replace with actual public IP in ECS config
-TRAEFIK_PORT = os.getenv("TRAEFIK_PORT", "3055")
+PFSENSE_IP = os.getenv("PFSENSE_IP", "145.220.75.91")
 TRAEFIK_PORT = os.getenv("TRAEFIK_PORT", "3055")
 FRONTEND_URL = os.getenv("FRONTEND_CORS_ORIGIN", "http://localhost:8080")
 
-"""
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[FRONTEND_URL], # Change this to the specific AWS frontend URL later for security
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-"""
+
+tagging_client = boto3.client('resourcegroupstaggingapi', region_name='eu-central-1')
+ecs_client = boto3.client('ecs', region_name='eu-central-1')
 
 class DeployRequest(BaseModel):
     user_id: str
@@ -55,8 +49,8 @@ async def trigger_deployment(payload: DeployRequest):
     # 3. Compile the deployment configuration
     deployment_config = {
         "container_name": payload.custom_name,
-        "routing_url": routing_url,
-        "target_environment": "on-prem", # Or dynamic based on template
+        "user_id": payload.user_id,
+        "target_environment": "aws-cloud", # Or dynamic based on template
         "injected_parameters": {
             "listen_port": "80", 
             "database_name": f"{payload.custom_name}_db",
@@ -145,3 +139,82 @@ async def update_configuration(payload: AdminUpdateRequest):
         }
     else:
         raise HTTPException(status_code=put_response.status_code, detail=put_response.text)
+    
+
+@app.delete("/api/deployments/{container_name}")
+async def delete_container(container_name: str, user_id: str, role: str):
+    """
+    Terminates the ECS container and deletes the GitOps state file.
+    """
+    # 1. Enforce RBAC (Basic validation)
+    if role not in ["user", "admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized role.")
+
+    cluster_name = os.getenv("ECS_CLUSTER_NAME", "your-cluster-name")
+
+    # ==========================================
+    # PHASE 1: Terminate Compute (AWS ECS)
+    # ==========================================
+    try:
+        # Find the ECS Task ARN using the custom tags applied by Lambda
+        response = tagging_client.get_resources(
+            ResourceTypeFilters=['ecs:task'],
+            TagFilters=[
+                {'Key': 'ContainerName', 'Values': [container_name]},
+                {'Key': 'Owner', 'Values': [user_id]} 
+            ]
+        )
+
+        resource_mapping = response.get('ResourceTagMappingList', [])
+        
+        if resource_mapping:
+            # If the task exists, kill it
+            task_arn = resource_mapping[0]['ResourceARN']
+            ecs_client.stop_task(
+                cluster=cluster_name,
+                task=task_arn,
+                reason="User requested deletion via self-service portal"
+            )
+            print(f"Terminating ECS Task: {task_arn}")
+
+    except Exception as e:
+        # We catch but don't fail here, just in case the container is already dead
+        print(f"ECS Termination Warning: {str(e)}")
+
+
+    # ==========================================
+    # PHASE 2: Clean State (GitHub GitOps)
+    # ==========================================
+    file_path = f"deployments/{container_name}.json"
+    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
+    
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    # Step A: Fetch the file to get its mandatory 'sha' hash
+    get_url = f"{url}?ref=deployments"
+    get_response = requests.get(get_url, headers=headers)
+    
+    if get_response.status_code != 200:
+        raise HTTPException(status_code=404, detail=f"GitOps state for '{container_name}' not found.")
+    
+    file_sha = get_response.json()["sha"]
+
+    # Step B: Execute the Delete request to GitHub
+    delete_data = {
+        "message": f"GitOps Teardown: {user_id} deleted {container_name}",
+        "sha": file_sha,
+        "branch": "deployments"
+    }
+
+    delete_response = requests.delete(url, headers=headers, json=delete_data)
+
+    if delete_response.status_code in [200, 201]:
+        return {
+            "status": "success", 
+            "message": f"Container '{container_name}' terminated and state removed from GitOps pipeline."
+        }
+    else:
+        raise HTTPException(status_code=delete_response.status_code, detail=delete_response.text)

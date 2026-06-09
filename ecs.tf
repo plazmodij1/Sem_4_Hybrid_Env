@@ -77,11 +77,9 @@ resource "aws_ecs_task_definition" "backend_task" {
         protocol        = "tcp"
     }]
     environment = [
-      { name = "PFSENSE_IP", value = "145.220.75.91" },
-      { name = "TRAEFIK_PORT", value = "3055" },
       { name = "REPO_OWNER", value = "plazmodij1" },
       { name = "REPO_NAME", value = "Sem_4_Hybrid_Env" },
-      { name = "FRONTEND_CORS_ORIGIN", value =  ""}
+      { name = "ECS_CLUSTER_NAME", value =  aws_ecs_cluster.main.name}
     ]
     secrets = [{
       name      = "GITHUB_TOKEN"

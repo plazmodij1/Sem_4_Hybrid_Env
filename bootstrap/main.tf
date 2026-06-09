@@ -9,7 +9,7 @@ provider "aws" {
 
 # S3 BUCKET FOR TERRAFORM STATE
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "fontys-marko-terraform-state-bucket"
+  bucket = "fontys-marko-terraform-state-bucket" # Change into the proftask s3 bucket
 
   tags = {
     Name        = "Terraform State Bucket"
@@ -65,7 +65,7 @@ resource "aws_dynamodb_table" "terraform_lock" {
 
 # Second S3 bucket for the container config files
 resource "aws_s3_bucket" "config_master" {
-  bucket        = "fontys-marko-config-master" 
+  bucket        = "fontys-marko-config-master" # Change into the proftask s3 bucket
   force_destroy = false
 
   tags = {
@@ -89,6 +89,11 @@ resource "aws_s3_bucket_versioning" "config_master_versioning" {
   versioning_configuration {
     status = "Enabled"
   }
+}
+
+resource "aws_s3_bucket_notification" "bucket_notification" {
+  bucket = aws_s3_bucket.config_master.id
+  eventbridge = true
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "config_master_encryption" {

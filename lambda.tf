@@ -1,27 +1,25 @@
+# Lambda function for deploying user containers (ECS)
 resource "aws_lambda_function" "main" {
   filename      = data.archive_file.lambda_zip.output_path
-  function_name = "dev-lambda"
+  function_name = "GitOps-ECS-Orchestrator"
   role          = aws_iam_role.lambda.arn
-  handler       = "lambda.handler"
-  runtime       = "nodejs20.x"
+  handler       = "lambda_functions.lambda_handler"
+  runtime       = "python3.10"
 
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
   timeout          = 15
 
-  vpc_config {
-    security_group_ids = [aws_security_group.lambda.id]
-    subnet_ids         = [aws_subnet.private["app"].id]
+  environment {
+    variables = {
+      ECS_CLUSTER_NAME = aws_ecs_cluster.main.name
+      ECS_TASK_DEFINITION = aws_ecs_task_definition.apache_template.family
+      APP_SUBNET_ID = aws_subnet.private["app"].id
+      ECS_SECURITY_GROUP_ID = aws_security_group.ecs.id
+    }
   }
 
-  #environment {
-  #  variables = {
-  #    DB_HOST    = var.proxy_endpoint
-  #    DB_NAME    = var.db_name
-  #    SECRET_ARN = var.db_secret_arn
-  #  }
-  #}
   tags = {
-    Name        = "Lambda-instance"
+    Name = "Lambda-instance"
   }
 }
 
@@ -31,4 +29,12 @@ resource "aws_lambda_permission" "alb" {
   function_name = aws_lambda_function.main.function_name
   principal     = "elasticloadbalancing.amazonaws.com"
   source_arn    = aws_lb_target_group.lambda.arn
+}
+
+resource "aws_lambda_permission" "allow_eventbridge" {
+  statement_id  = "AllowExecutionFromEventBridge"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.main.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.s3_json_upload.arn
 }
