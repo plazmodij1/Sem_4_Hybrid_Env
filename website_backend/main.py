@@ -9,16 +9,6 @@ from datetime import datetime
 
 app = FastAPI(title="Hybrid Cloud Deployment Engine")
 
-FRONTEND_URL = os.getenv("FRONTEND_CORS_ORIGIN", "http://localhost:8080")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # Change this to the specific AWS frontend URL later for security
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Environment Variables
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_OWNER = os.getenv("REPO_OWNER")
@@ -28,13 +18,15 @@ TRAEFIK_PORT = os.getenv("TRAEFIK_PORT", "3055")
 TRAEFIK_PORT = os.getenv("TRAEFIK_PORT", "3055")
 FRONTEND_URL = os.getenv("FRONTEND_CORS_ORIGIN", "http://localhost:8080")
 
+"""
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Change this to the specific AWS frontend URL later for security
+    allow_origins=[FRONTEND_URL], # Change this to the specific AWS frontend URL later for security
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+"""
 
 class DeployRequest(BaseModel):
     user_id: str
