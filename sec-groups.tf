@@ -34,14 +34,14 @@ resource "aws_security_group" "ecs" {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id] 
+    cidr_blocks = ["10.1.0.0/16"]
   }
 
   ingress {
     from_port       = 8000
     to_port         = 8000
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id] 
+    cidr_blocks = ["10.1.0.0/16"]
   }
 
   egress {
@@ -64,7 +64,6 @@ resource "aws_security_group" "lambda" {
   }
 }
 
-
 # Security group for VPC endpoints 
 resource "aws_security_group" "vpc_endpoints" {
   name        = "vpc-endpoints-sg"
@@ -84,4 +83,16 @@ resource "aws_security_group" "vpc_endpoints" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
+
+# Overwrite the security group rule inside the fck-nat module
+resource "aws_security_group_rule" "fck_nat_allow_private" {
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["10.0.0.0/16"]
+  
+  # This targets the security group outputted by the module
+  security_group_id = module.fck_nat.security_group_id
 }

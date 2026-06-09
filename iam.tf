@@ -72,6 +72,36 @@ resource "aws_iam_role" "ecs_task_execution" {
   })
 }
 
+resource "aws_iam_policy" "backend_ssm_policy" {
+  name        = "backend-ssm-access"
+  description = "Allow backend to pull GitHub token from SSM"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "ssm:GetParameters",
+          "ssm:GetParameter"
+        ]
+        Effect   = "Allow"
+        Resource = "arn:aws:ssm:eu-central-1:027053845110:parameter/hybrid-cloud/github-token" #CHANGE THE ACCOUNT ID
+      },
+      {
+        Action   = ["kms:Decrypt"]
+        Effect   = "Allow"
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Attach this policy to your existing execution role
+resource "aws_iam_role_policy_attachment" "backend_ssm_attach" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = aws_iam_policy.backend_ssm_policy.arn
+}
+
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
   role       = aws_iam_role.ecs_task_execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
