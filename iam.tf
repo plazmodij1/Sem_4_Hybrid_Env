@@ -16,10 +16,74 @@ resource "aws_iam_role_policy" "lambda_ecs_policy" {
   policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
-      { Effect = "Allow", Action = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"], Resource = "arn:aws:logs:*:*:*" },
-      { Effect = "Allow", Action = ["s3:GetObject"], Resource = "arn:aws:s3:::fontys-marko-config-master/*" }, #change to proftask s3 bucket name
-      { Effect = "Allow", Action = ["ecs:RunTask", "ecs:TagResource"], Resource = "*" },
-      { Effect = "Allow", Action = ["iam:PassRole"], Resource = "*" } 
+      { 
+        Effect = "Allow", 
+        Action = [
+          "logs:CreateLogGroup", 
+          "logs:CreateLogStream", 
+          "logs:PutLogEvents"
+        ],
+        Resource = "arn:aws:logs:*:*:*" 
+      },
+      { 
+        Effect = "Allow", 
+        Action = ["s3:GetObject"], 
+        Resource = "arn:aws:s3:::fontys-marko-config-master/*" #change to proftask s3 bucket name
+      }, 
+      { 
+        Effect = "Allow", 
+        Action = [
+          "ecs:RunTask", 
+          "ecs:TagResource"
+        ],
+        Resource = "*" 
+      },
+      { 
+        Effect = "Allow", 
+        Action = ["iam:PassRole"], 
+        Resource = "*" 
+      } 
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "lambda_alb_policy" {
+  name = "LambdaALBAccess"
+  role = aws_iam_role.lambda.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:*:*:*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:CreateTargetGroup",
+                "elasticloadbalancing:DeleteTargetGroup",
+                "elasticloadbalancing:RegisterTargets",
+                "elasticloadbalancing:DeregisterTargets",
+                "elasticloadbalancing:CreateRule",
+                "elasticloadbalancing:DeleteRule",
+                "elasticloadbalancing:DescribeRules",
+                "elasticloadbalancing:DescribeTargetGroups"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ecs:DescribeTasks",
+                "ecs:ListTasks"
+            ],
+            "Resource": "*"
+        }
     ]
   })
 }

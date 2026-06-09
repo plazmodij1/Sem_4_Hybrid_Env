@@ -1,4 +1,3 @@
-
 resource "aws_route53_health_check" "alb_health" {
   fqdn              = aws_lb.main.dns_name 
   port              = 80
@@ -47,5 +46,17 @@ resource "aws_route53_record" "fontys_secondary" {
 
   failover_routing_policy {
     type = "SECONDARY"
+  }
+}
+
+resource "aws_route53_record" "sandbox_wildcard" {
+  zone_id = data.aws_route53_zone.fontys_zone.id
+  name = "*.sandbox"
+  type = "A"
+
+  alias {
+    name = aws_lb.main.dns_name
+    zone_id = aws_lb.main.zone_id
+    evaluate_target_health = false
   }
 }

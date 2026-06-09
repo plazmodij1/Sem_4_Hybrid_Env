@@ -59,18 +59,6 @@ resource "aws_lb_target_group_attachment" "aws_attach" {
   depends_on        = [aws_lambda_permission.alb]
 }
 
-# LISTENER
-resource "aws_lb_listener" "http_listener" {
-  load_balancer_arn = aws_lb.main.arn
-  port              = 81
-  protocol          = "HTTP"
-
-  default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.lambda.arn
-  }
-}
-
 # Listener for the portal
 resource "aws_lb_listener" "portal_listener" {
   load_balancer_arn = aws_lb.main.arn

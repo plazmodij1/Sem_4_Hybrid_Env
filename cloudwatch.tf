@@ -19,3 +19,23 @@ resource "aws_cloudwatch_event_target" "trigger_lambda" {
   target_id = "TriggerGitOpsLambda"
   arn       = aws_lambda_function.main.arn
 }
+
+resource "aws_cloudwatch_event_rule" "ecs_running_rule" {
+  name        = "ecs-task-running-registrar"
+  description = "Triggers Lambda when an ECS task hits RUNNING state"
+
+  event_pattern = jsonencode({
+    source      = ["aws.ecs"]
+    detail-type = ["ECS Task State Change"]
+    detail = {
+      lastStatus = ["RUNNING"]
+    }
+  })
+}
+
+resource "aws_cloudwatch_event_target" "lambda_target" {
+  rule      = aws_cloudwatch_event_rule.ecs_running_rule.name
+  target_id = "SendToRegistrarLambda"
+  arn       = aws_lambda_function.alb_dynamic_registrar.arn
+}
+

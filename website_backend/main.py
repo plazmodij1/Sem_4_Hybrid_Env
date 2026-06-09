@@ -50,7 +50,8 @@ async def trigger_deployment(payload: DeployRequest):
     deployment_config = {
         "container_name": payload.custom_name,
         "user_id": payload.user_id,
-        "target_environment": "aws-cloud", # Or dynamic based on template
+        "routing_url": routing_url,
+        "target_environment": "on-prem", # Or dynamic based on template
         "injected_parameters": {
             "listen_port": "80", 
             "database_name": f"{payload.custom_name}_db",
@@ -156,31 +157,48 @@ async def delete_container(container_name: str, user_id: str, role: str):
     # PHASE 1: Terminate Compute (AWS ECS)
     # ==========================================
     try:
-        # Find the ECS Task ARN using the custom tags applied by Lambda
-        response = tagging_client.get_resources(
-            ResourceTypeFilters=['ecs:task'],
-            TagFilters=[
-                {'Key': 'ContainerName', 'Values': [container_name]},
-                {'Key': 'Owner', 'Values': [user_id]} 
-            ]
-        )
+        # 1. Bypass the SCP: Get all running tasks natively from your ECS cluster
+        paginator = ecs_client.get_paginator('list_tasks')
+        all_task_arns = []
+        for page in paginator.paginate(cluster=cluster_name, desiredStatus='RUNNING'):
+            all_task_arns.extend(page.get('taskArns', []))
 
-        resource_mapping = response.get('ResourceTagMappingList', [])
-        
-        if resource_mapping:
-            # If the task exists, kill it
-            task_arn = resource_mapping[0]['ResourceARN']
+        target_task_arn = None
+
+        # 2. Describe tasks in batches to read their tags internally
+        if all_task_arns:
+            for i in range(0, len(all_task_arns), 100):
+                batch = all_task_arns[i:i+100]
+                describe_response = ecs_client.describe_tasks(
+                    cluster=cluster_name,
+                    tasks=batch,
+                    include=['TAGS']
+                )
+
+                for task in describe_response.get('tasks', []):
+                    tags = {tag['key']: tag['value'] for tag in task.get('tags', [])}
+                    
+                    # 3. Match the tags
+                    if tags.get('ContainerName') == container_name and tags.get('Owner') == user_id:
+                        target_task_arn = task['taskArn']
+                        break
+                
+                if target_task_arn:
+                    break
+
+        # 4. Execute the kill command
+        if target_task_arn:
             ecs_client.stop_task(
                 cluster=cluster_name,
-                task=task_arn,
+                task=target_task_arn,
                 reason="User requested deletion via self-service portal"
             )
-            print(f"Terminating ECS Task: {task_arn}")
+            print(f"Terminating ECS Task: {target_task_arn}")
+        else:
+            print(f"Warning: No running task found for '{container_name}'")
 
     except Exception as e:
-        # We catch but don't fail here, just in case the container is already dead
-        print(f"ECS Termination Warning: {str(e)}")
-
+        print(f"ECS Termination Error: {str(e)}")
 
     # ==========================================
     # PHASE 2: Clean State (GitHub GitOps)

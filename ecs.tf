@@ -157,9 +157,6 @@ resource "aws_ecs_task_definition" "apache_template" {
     }])
 }
 
-
-
-# Log group which was defined in "apache_template"
 resource "aws_cloudwatch_log_group" "apache_logs" {
   name              = "/ecs/apache-web"
   retention_in_days = 7
