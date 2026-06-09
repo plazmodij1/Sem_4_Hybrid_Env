@@ -96,7 +96,6 @@ resource "aws_iam_policy" "backend_ssm_policy" {
   })
 }
 
-# Attach this policy to your existing execution role
 resource "aws_iam_role_policy_attachment" "backend_ssm_attach" {
   role       = aws_iam_role.ecs_task_execution.name
   policy_arn = aws_iam_policy.backend_ssm_policy.arn
@@ -105,4 +104,38 @@ resource "aws_iam_role_policy_attachment" "backend_ssm_attach" {
 resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
   role       = aws_iam_role.ecs_task_execution.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# Github role to access S3 bucket
+resource "aws_iam_role" "github_actions_s3_role" {
+  name = "GitHubActionsS3SyncRole"
+  assume_role_policy = data.aws_iam_policy_document.github_assume_role.json
+}
+
+resource "aws_iam_role_policy" "s3_sync_policy" {
+  name = "S3MasterBucketSyncPolicy"
+  role = aws_iam_role.github_actions_s3_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation"
+        ]
+        Resource = "arn:aws:s3:::fontys-marko-config-master" #change to group s3 bucket name
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "arn:aws:s3:::fontys-marko-config-master/*" #change to group s3 bucket name
+      }
+    ]
+  })
 }

@@ -1,3 +1,7 @@
+data"aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
+}
+
 data "archive_file" "lambda_zip" {
   type        = "zip"
   source_file  = "./lambda.js"
@@ -8,10 +12,31 @@ data "aws_route53_zone" "fontys_zone" {
   name = "fontys-proftask.lat"
 
   tags = {
-    Name = "Fontys Zone"
+    Name = "Fontys_Zone"
   }
 }
 
 data "aws_s3_bucket" "main" {
   bucket = "fontys-marko-terraform-state-bucket"
+}
+
+# Assume role policy for the "deployments" branch in Github repo
+data "aws_iam_policy_document" "github_assume_role" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type = "Federated"
+      identifiers = [data.aws_iam_openid_connect_provider.github.arn] 
+    }
+    condition {
+      test = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values = ["sts.amazonaws.com"]
+    }
+    condition {
+      test = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      values = ["repo:plazmodij1/Sem_4_Hybrid_Env:ref:refs/heads/deployments"]
+    }
+  }
 }
