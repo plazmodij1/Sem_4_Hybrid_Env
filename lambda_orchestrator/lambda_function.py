@@ -52,7 +52,7 @@ def lambda_handler(event, context):
             overrides={
                 'containerOverrides': [
                     {
-                        'name': 'apache_container', 
+                        'name': 'apache-container', 
                         'environment': [
                             {
                                 "name": "CONFIG_URL",
