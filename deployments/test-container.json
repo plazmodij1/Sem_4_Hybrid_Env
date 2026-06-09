@@ -3,8 +3,8 @@
   "routing_url": "test-container.145.220.75.91.nip.io",
   "target_environment": "on-prem",
   "injected_parameters": {
-    "listen_port": "80",
-    "database_name": "test-container_db",
+    "listen_port": "1234",
+    "database_name": "dawdaw",
     "auto_generated_credential_secret_id": "secret-test-container"
   }
 }
