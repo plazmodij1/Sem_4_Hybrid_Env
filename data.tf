@@ -6,6 +6,10 @@ data "archive_file" "lambda_zip" {
 
 data "aws_route53_zone" "fontys_zone" {
   name = "fontys-proftask.lat"
+
+  tags = {
+    Name = "Fontys Zone"
+  }
 }
 
 data "aws_s3_bucket" "main" {

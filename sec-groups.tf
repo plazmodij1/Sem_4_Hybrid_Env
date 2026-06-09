@@ -25,8 +25,20 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-# Security group for the Lambda function allowing outbound traffic to the backend services
+# Security group for the ECS function allowing outbound traffic to the backend services
 resource "aws_security_group" "ecs" {
+  name   = "ecs-sg"
+  vpc_id = aws_vpc.private.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_security_group" "lambda" {
   name   = "lambda-sg"
   vpc_id = aws_vpc.private.id
 
@@ -37,6 +49,7 @@ resource "aws_security_group" "ecs" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+
 
 # Security group for VPC endpoints 
 resource "aws_security_group" "vpc_endpoints" {

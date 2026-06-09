@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import json
@@ -8,12 +9,32 @@ from datetime import datetime
 
 app = FastAPI(title="Hybrid Cloud Deployment Engine")
 
+FRONTEND_URL = os.getenv("FRONTEND_CORS_ORIGIN", "http://localhost:8080")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Change this to the specific AWS frontend URL later for security
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Environment Variables
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_OWNER = os.getenv("REPO_OWNER")
 REPO_NAME = os.getenv("REPO_NAME")
 PFSENSE_IP = os.getenv("PFSENSE_IP", "127.0.0.1") # Replace with actual public IP in ECS config
 TRAEFIK_PORT = os.getenv("TRAEFIK_PORT", "3055")
+TRAEFIK_PORT = os.getenv("TRAEFIK_PORT", "3055")
+FRONTEND_URL = os.getenv("FRONTEND_CORS_ORIGIN", "http://localhost:8080")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Change this to the specific AWS frontend URL later for security
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class DeployRequest(BaseModel):
     user_id: str
@@ -87,14 +108,16 @@ async def update_configuration(payload: AdminUpdateRequest):
 
     file_path = f"deployments/{payload.container_name}.json"
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
-    
+
+    get_url = f"{url}?ref=deployments"
+
     headers = {
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
     }
 
     # 2. Fetch the current configuration from GitHub
-    get_response = requests.get(url, headers=headers)
+    get_response = requests.get(get_url, headers=headers)
     if get_response.status_code != 200:
         raise HTTPException(status_code=404, detail=f"Configuration for '{payload.container_name}' not found.")
 

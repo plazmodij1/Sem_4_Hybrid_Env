@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid Container Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-8">
+
+    <div class="max-w-4xl mx-auto space-y-8">
+        <header class="border-b border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold text-blue-400">Hybrid Container Self-Service</h1>
+            <p class="text-gray-400 mt-1">Deploy and manage containers across AWS and On-Premises</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <section class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4 border-b border-gray-600 pb-2">New Deployment</h2>
+                <form id="deployForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">User ID</label>
+                        <input type="text" id="deployUser" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white" value="user_123" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Container Template</label>
+                        <select id="deployTemplate" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white">
+                            <option value="apache-web">Apache Web Server</option>
+                            <option value="mysql-8">MySQL 8 Database</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Custom Name</label>
+                        <input type="text" id="deployName" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white" placeholder="my-custom-website" required>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded transition">Deploy Container</button>
+                </form>
+            </section>
+
+            <section class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+                <h2 class="text-xl font-semibold mb-4 border-b border-gray-600 pb-2 text-orange-400">Admin Config Update</h2>
+                <form id="updateForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Admin ID</label>
+                        <input type="text" id="adminUser" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white" value="admin_01" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Target Container Name</label>
+                        <input type="text" id="updateTargetName" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white" placeholder="my-custom-website" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Listen Port (Update)</label>
+                        <input type="text" id="updatePort" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white" placeholder="8080">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Database Name (Update)</label>
+                        <input type="text" id="updateDbName" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white" placeholder="new_webapp_data">
+                    </div>
+                    <button type="submit" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-4 rounded transition">Push Config Update</button>
+                </form>
+            </section>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = "http://YOUR_FASTAPI_IP:8000/api"; // Update this to your backend IP/Domain
+
+        // 1. Handle Deploy
+        document.getElementById('deployForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const payload = {
+                user_id: document.getElementById('deployUser').value,
+                role: "user",
+                container_template: document.getElementById('deployTemplate').value,
+                custom_name: document.getElementById('deployName').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/deploy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                alert('Deployment Triggered! Check your Git repository.');
+                console.log(data);
+            } catch (error) {
+                console.error('Deployment Error:', error);
+                alert('Failed to reach backend API.');
+            }
+        });
+
+        // 2. Handle Admin Update
+        document.getElementById('updateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const payload = {
+                user_id: document.getElementById('adminUser').value,
+                role: "admin",
+                container_name: document.getElementById('updateTargetName').value,
+                updated_parameters: {
+                    listen_port: document.getElementById('updatePort').value || undefined,
+                    database_name: document.getElementById('updateDbName').value || undefined
+                }
+            };
+
+            // Remove undefined parameters cleanly
+            Object.keys(payload.updated_parameters).forEach(key => {
+                if (payload.updated_parameters[key] === undefined) {
+                    delete payload.updated_parameters[key];
+                }
+            });
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/config/update`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                alert('Config Update Pushed to Git!');
+                console.log(data);
+            } catch (error) {
+                console.error('Update Error:', error);
+                alert('Failed to reach backend API.');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -65,6 +65,10 @@ resource "aws_dynamodb_table" "terraform_lock" {
 
 resource "aws_route53_zone" "fontys_zone" {
   name = "fontys-proftask.lat"
+  
+  tags = {
+    Name = "Fontys Zone"
+  }
 }
 
 resource "aws_ecr_repository" "httpd_repo" {

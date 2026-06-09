@@ -65,7 +65,8 @@ resource "aws_ecs_task_definition" "backend_task" {
       { name = "PFSENSE_IP", value = "145.220.75.91" },
       { name = "TRAEFIK_PORT", value = "3055" },
       { name = "REPO_OWNER", value = "plazmodij1" },
-      { name = "REPO_NAME", value = "Sem_4_Hybrid_Env" }
+      { name = "REPO_NAME", value = "Sem_4_Hybrid_Env" },
+      { name = "FRONTEND_CORS_ORIGIN", value = "" }
     ]
     secrets = [{
       name = "GITHUB_TOKEN"
@@ -83,7 +84,7 @@ resource "aws_ecs_service" "backend_service" {
 
     network_configuration {
       subnets = [aws_subnet.private["app"].id]
-      security_groups = [aws_security.ecs.id]
+      security_groups = [aws_security_group.ecs.id]
       assign_public_ip = false
     }
 }
