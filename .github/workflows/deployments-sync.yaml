@@ -24,7 +24,9 @@ jobs:
 
       - name: Sync JSON configs to S3 Master Bucket
         run: |
-          aws s3 sync ./ s3://fontys-marko-config-master/ \ 
+          aws s3 sync ./ s3://fontys-marko-config-master/ \
             --exclude "*" \
             --include "*.json" \
             --delete
+
+            
