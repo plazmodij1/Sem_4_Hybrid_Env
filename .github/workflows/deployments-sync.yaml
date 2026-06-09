@@ -15,18 +15,30 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 
 
       - name: Configure AWS Credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::027053845110:role/GitHubActionsS3SyncRole #change the account id
+          # REMEMBER TO UPDATE YOUR ACCOUNT ID HERE
+          role-to-assume: arn:aws:iam::027053845110:role/GitHubActionsS3SyncRole #change the account id to the proftask account
           aws-region: eu-central-1
 
-      - name: Sync JSON configs to S3 Master Bucket
+      - name: Smart Sync (Only Changed Files)
         run: |
-          aws s3 sync ./ s3://fontys-marko-config-master/ \
-            --exclude "*" \
-            --include "*.json" \
-            --delete
-
-            
+          # 1. Find newly added (A) or modified (M) JSON files
+          CHANGED_FILES=$(git diff --name-only --diff-filter=AM HEAD^ HEAD | grep '\.json$' || true)
+          
+          for file in $CHANGED_FILES; do
+            echo "Uploading $file..."
+            aws s3 cp "./$file" "s3://fontys-marko-config-master/$file" #change to proftask s3 bucket
+          done
+          
+          # 2. Find deleted (D) JSON files to clean up S3 during Teardown
+          DELETED_FILES=$(git diff --name-only --diff-filter=D HEAD^ HEAD | grep '\.json$' || true)
+          
+          for file in $DELETED_FILES; do
+            echo "Removing $file from S3..."
+            aws s3 rm "s3://fontys-marko-config-master/$file" #change the account id to the proftask account
+          done

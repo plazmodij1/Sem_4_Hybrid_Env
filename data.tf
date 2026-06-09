@@ -4,8 +4,8 @@ data"aws_iam_openid_connect_provider" "github" {
 
 data "archive_file" "lambda_zip" {
   type        = "zip"
-  source_file  = "./lambda.js"
-  output_path = "./lambda.zip"
+  source_file  = "${path.module}/lambda_orchestrator/lambda_function.py"
+  output_path = "${path.module}/lambda_orchestrator/function.zip/function.zip"
 }
 
 data "aws_route53_zone" "fontys_zone" {
