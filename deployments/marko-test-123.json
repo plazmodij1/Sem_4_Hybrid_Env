@@ -1,0 +1,11 @@
+{
+  "container_name": "marko-test-123",
+  "user_id": "Marko",
+  "routing_url": "marko-test-123.145.220.75.91.nip.io",
+  "target_environment": "on-prem",
+  "injected_parameters": {
+    "listen_port": "80",
+    "database_name": "marko-test-123_db",
+    "auto_generated_credential_secret_id": "secret-marko-test-123"
+  }
+}
