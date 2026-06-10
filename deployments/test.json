@@ -1,0 +1,11 @@
+{
+  "container_name": "test",
+  "user_id": "test",
+  "routing_url": "test.sandbox.fontys-proftask.lat",
+  "target_environment": "on-prem",
+  "injected_parameters": {
+    "listen_port": "80",
+    "database_name": "test_db",
+    "auto_generated_credential_secret_id": "secret-test"
+  }
+}
