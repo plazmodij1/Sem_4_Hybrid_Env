@@ -6,6 +6,9 @@
   "injected_parameters": {
     "listen_port": "80",
     "database_name": "test-123_db",
-    "auto_generated_credential_secret_id": "secret-test-123"
+    "auto_generated_credential_secret_id": "secret-test-123",
+    "additionalProp1": {
+      "port": "1234"
+    }
   }
 }
