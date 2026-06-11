@@ -1,0 +1,11 @@
+{
+  "container_name": "eawawdaw",
+  "user_id": "Marko",
+  "routing_url": "eawawdaw.145.220.75.91.nip.io",
+  "target_environment": "on-prem",
+  "injected_parameters": {
+    "listen_port": "80",
+    "database_name": "eawawdaw_db",
+    "auto_generated_credential_secret_id": "secret-eawawdaw"
+  }
+}
