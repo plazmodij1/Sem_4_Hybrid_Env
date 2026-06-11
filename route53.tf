@@ -2,13 +2,13 @@ resource "aws_route53_health_check" "alb_health" {
   fqdn              = aws_lb.main.dns_name 
   port              = 80
   type              = "HTTP"
-  resource_path     = "/health"
+  resource_path     = "/"
   
-  failure_threshold = 1
+  failure_threshold = 2
   request_interval  = 10
 
   tags = {
-    Name = "alb-lambda-health-check"
+    Name = "aws-user-panel-health"
   }
 }
 

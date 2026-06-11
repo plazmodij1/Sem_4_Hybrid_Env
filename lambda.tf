@@ -12,7 +12,9 @@ resource "aws_lambda_function" "main" {
   environment {
     variables = {
       ECS_CLUSTER_NAME = aws_ecs_cluster.main.name
-      ECS_TASK_DEFINITION = aws_ecs_task_definition.apache_template.family
+      ECS_TASK_DEFINITION = aws_ecs_task_definition.website-template-1.family
+      ECS_TASK_DEFINITION_2 = aws_ecs_task_definition.website-template-2.family
+
       APP_SUBNET_ID = aws_subnet.private["app"].id
       ECS_SECURITY_GROUP_ID = aws_security_group.ecs.id
     }

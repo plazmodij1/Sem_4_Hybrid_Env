@@ -6,7 +6,19 @@ ecs_client = boto3.client('ecs')
 s3_client = boto3.client('s3')
 
 def lambda_handler(event, context):
-    # 1. Extract bucket and key from the EventBridge payload
+    # 1. Extract the current status of the task from the EventBridge payload
+    last_status = event.get('detail', {}).get('lastStatus')
+    desired_status = event.get('detail', {}).get('desiredStatus')
+    
+    # 2. THE FIX: Ignore the event if the task is stopping or stopped
+    if last_status in ['STOPPING', 'STOPPED'] or desired_status == 'STOPPED':
+        print(f"Task is shutting down (Status: {last_status}). Skipping network registration.")
+        return {
+            "statusCode": 200,
+            "body": "Ignored shutdown event"
+        }
+    
+    # 3. Extract bucket and key from the EventBridge payload
     detail = event.get('detail', {})
     bucket_name = detail.get('bucket', {}).get('name')
     object_key = detail.get('object', {}).get('key')
@@ -16,31 +28,46 @@ def lambda_handler(event, context):
         return {"status": "Error"}
 
     s3_url = f"s3://{bucket_name}/{object_key}"
-    print(f"Triggering deployment for config: {s3_url}")
+    print(f"Triggering AWS deployment for config: {s3_url}")
 
-    # 2. Peek into the S3 JSON purely to extract metadata for Tagging
+    # 4. Extract configuration and metadata from the JSON payload
     try:
         response = s3_client.get_object(Bucket=bucket_name, Key=object_key)
         config_data = json.loads(response['Body'].read().decode('utf-8'))
         
         container_name = config_data.get('container_name', 'unknown-container')
-        # If user_id is not yet in your compiled S3 JSON, it will default to 'unknown-user'
         owner_id = config_data.get('user_id', 'unknown-user') 
+        template_id = config_data.get('template_id', 'website-template-1')
     except Exception as e:
         print(f"Error reading S3 object for metadata: {e}")
         raise e
 
-    # 3. Fetch Infrastructure IDs from Lambda Environment Variables
+    # 5. Fetch Core Infrastructure IDs from Lambda Environment Variables
     cluster_name = os.environ['ECS_CLUSTER_NAME']
-    task_definition = os.environ['ECS_TASK_DEFINITION']
     subnet_id = os.environ['APP_SUBNET_ID']
     security_group_id = os.environ['ECS_SECURITY_GROUP_ID']
 
-    # 4. Execute the Container with strict AWS Resource Tags
+    # --- AWS TEMPLATE REGISTRY MAPPING ---
+    # Map the template IDs directly to their corresponding AWS ECS Task Definitions
+    TEMPLATE_REGISTRY = {
+        "website-template-1": {
+            "task_definition": os.environ.get('ECS_TASK_DEFINITION', 'fallback-task-def'), 
+            "container_name": "website-template-1"
+        },
+        "website-template-2": {
+            "task_definition": os.environ.get('ECS_TASK_DEFINITION_2', 'fallback-task-def'),
+            "container_name": "website-template-2" 
+        }
+    }
+
+    # Grab the exact configuration for the chosen template, fallback to template-1 if missing
+    target_config = TEMPLATE_REGISTRY.get(template_id, TEMPLATE_REGISTRY["website-template-1"])
+
+    # 6. Execute the Fargate Container Task
     try:
         run_task_response = ecs_client.run_task(
             cluster=cluster_name,
-            taskDefinition=task_definition,
+            taskDefinition=target_config["task_definition"],
             launchType='FARGATE',
             networkConfiguration={
                 'awsvpcConfiguration': {
@@ -52,7 +79,8 @@ def lambda_handler(event, context):
             overrides={
                 'containerOverrides': [
                     {
-                        'name': 'apache-container', 
+                        # Dynamically inject the correct container name for the override path
+                        'name': target_config["container_name"], 
                         'environment': [
                             {
                                 "name": "CONFIG_URL",
@@ -62,7 +90,6 @@ def lambda_handler(event, context):
                     }
                 ]
             },
-            # --- NEW TAGGING IMPLEMENTATION ---
             tags=[
                 {
                     'key': 'ContainerName',

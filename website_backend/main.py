@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException, APIRouter
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import json
@@ -11,13 +10,12 @@ from datetime import datetime
 app = FastAPI(title="Hybrid Cloud Deployment Engine")
 
 # Environment Variables
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-REPO_OWNER = os.getenv("REPO_OWNER")
-REPO_NAME = os.getenv("REPO_NAME")
-PFSENSE_IP = os.getenv("PFSENSE_IP", "145.220.75.91")
-TRAEFIK_PORT = os.getenv("TRAEFIK_PORT", "3055")
-FRONTEND_URL = os.getenv("FRONTEND_CORS_ORIGIN", "http://localhost:8080")
-
+github_token = os.getenv("GITHUB_TOKEN")
+repo_owner = os.getenv("REPO_OWNER")
+repo_name = os.getenv("REPO_NAME")
+cluster_name = os.getenv("ECS_CLUSTER_NAME", "your-cluster-name")
+alb_listener_arn = os.getenv("ALB_LISTENER_ARN")
+domain_suffix = os.getenv("DOMAIN_SUFFIX", "sandbox.fontys-proftask.lat")
 
 tagging_client = boto3.client('resourcegroupstaggingapi', region_name='eu-central-1')
 ecs_client = boto3.client('ecs', region_name='eu-central-1')
@@ -36,44 +34,66 @@ class AdminUpdateRequest(BaseModel):
     container_name: str
     updated_parameters: dict
 
-@app.post("/api/deploy")
+@app.post("/api/deploy") # Ensure this matches your frontend fetch URL!
 async def trigger_deployment(payload: DeployRequest):
-    # Enforce basic RBAC from the payload (Cognito/Keycloak validation would wrap this)
+    # Enforce basic RBAC
     if payload.role not in ["user", "admin"]:
         raise HTTPException(status_code=403, detail="Unauthorized role.")
 
-    # 1. Calculate the pure DNS route for Traefik
-    routing_url = f"{payload.custom_name}.{PFSENSE_IP}.nip.io"
+    # --- NEW: Template Registry ---
+    # This acts as our database of available containers
+    TEMPLATE_REGISTRY = {
+        "website-template-1": {
+            "image": "nginx:latest",
+            "listen_port": "80",
+            "target_environment": "aws" # Let's send template 1 to the cloud
+        },
+        "website-template-2": {
+            "image": "httpd:alpine", # Apache
+            "listen_port": "8080",
+            "target_environment": "aws" # Let's send template 2 to the local Swarm
+        }
+    }
+
+    # Validate that the requested template actually exists in our registry
+    if payload.container_template not in TEMPLATE_REGISTRY:
+        raise HTTPException(status_code=400, detail=f"Unknown template: {payload.container_template}")
+
+    # Fetch the specific config for the chosen template
+    selected_template = TEMPLATE_REGISTRY[payload.container_template]
+
+    # 1. Calculate the pure DNS route for Traefik / ALB
+    routing_url = f"{payload.custom_name}.{domain_suffix}"
     
     # 2. Calculate the actual clickable URL for the user
-    clickable_url = f"http://{routing_url}:{TRAEFIK_PORT}"
+    clickable_url = f"http://{routing_url}"
 
-    # 3. Compile the deployment configuration
+    # 3. Compile the deployment configuration using the Template Registry data
     deployment_config = {
         "container_name": payload.custom_name,
         "user_id": payload.user_id,
+        "template_id": payload.container_template,
         "routing_url": routing_url,
-        "target_environment": "on-prem", # Or dynamic based on template
+        "target_environment": selected_template["target_environment"], 
         "injected_parameters": {
-            "listen_port": "80", 
-            "database_name": f"{payload.custom_name}_db",
-            "auto_generated_credential_secret_id": f"secret-{payload.custom_name}"
+            "image": selected_template["image"],
+            "listen_port": selected_template["listen_port"], 
         }
     }
     
     config_json_str = json.dumps(deployment_config, indent=2)
 
-    # 4. GitHub REST API - Push Commit to Main
+    # 4. GitHub REST API - Push Commit to Deployments branch
     file_path = f"deployments/{payload.custom_name}.json"
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
     
     headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Authorization": f"Bearer {github_token}",
         "Accept": "application/vnd.github.v3+json"
     }
     
     data = {
-        "message": f"GitOps Trigger: Deploy {payload.custom_name} by {payload.user_id}",
+        "message": f"GitOps Trigger: Deploy {payload.custom_name} ({payload.container_template})",
         "content": base64.b64encode(config_json_str.encode("utf-8")).decode("utf-8"),
         "branch": "deployments"
     }
@@ -96,20 +116,18 @@ async def update_configuration(payload: AdminUpdateRequest):
         raise HTTPException(status_code=403, detail="Admin privileges required.")
 
     file_path = f"deployments/{payload.container_name}.json"
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
 
     get_url = f"{url}?ref=deployments"
 
     headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Authorization": f"Bearer {github_token}",
         "Accept": "application/vnd.github.v3+json"
     }
     
     container_name = payload.container_name
 
-    cluster_name = os.getenv("ECS_CLUSTER_NAME", "your-cluster-name")
-    alb_listener_arn = os.getenv("ALB_LISTENER_ARN")
-    domain_suffix = os.getenv("DOMAIN_SUFFIX", "sandbox.fontys-proftask.lat")
+
 
     # ==========================================================
     # STEP 1: PRE-UPDATE CLEANUP (Wipe old network & compute)
@@ -222,9 +240,7 @@ async def delete_container(container_name: str, user_id: str, role: str):
     if role not in ["user", "admin"]:
         raise HTTPException(status_code=403, detail="Unauthorized role.")
 
-    cluster_name = os.getenv("ECS_CLUSTER_NAME", "your-cluster-name")
-    alb_listener_arn = os.getenv("ALB_LISTENER_ARN")
-    domain_suffix = os.getenv("DOMAIN_SUFFIX", "sandbox.fontys-proftask.lat")
+
 
     # ==========================================
     # PHASE 1: Network Teardown (ALB & Target Group)
@@ -326,10 +342,10 @@ async def delete_container(container_name: str, user_id: str, role: str):
     # PHASE 3: Clean State (GitHub GitOps)
     # ==========================================
     file_path = f"deployments/{container_name}.json"
-    url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
     
     headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Authorization": f"Bearer {github_token}",
         "Accept": "application/vnd.github.v3+json"
     }
 

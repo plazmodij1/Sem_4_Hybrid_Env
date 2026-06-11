@@ -29,7 +29,7 @@ resource "aws_ecs_task_definition" "backend_task" {
     ]
     secrets = [{
       name      = "GITHUB_TOKEN"
-      valueFrom = "arn:aws:ssm:eu-central-1:027053845110:parameter/hybrid-cloud/github-token" #CHANGE THE ACCOUNT ID
+      valueFrom = "/hybrid-cloud/github-token" #CHANGE THE ACCOUNT ID
     }]
     logConfiguration = {
         logDriver = "awslogs"
@@ -62,8 +62,8 @@ resource "aws_ecs_service" "backend_service" {
     }
 }
 
-resource "aws_ecs_task_definition" "apache_template" {
-    family                      = "apache-web-template"
+resource "aws_ecs_task_definition" "website-template-1" {
+    family                      = "website-template-1"
     requires_compatibilities    = ["FARGATE"]
     network_mode                = "awsvpc"
     cpu                         = 256
@@ -72,8 +72,8 @@ resource "aws_ecs_task_definition" "apache_template" {
     execution_role_arn          = aws_iam_role.ecs_task_execution.arn
 
     container_definitions = jsonencode([{
-        name        = "apache-container"
-        image       = "027053845110.dkr.ecr.eu-central-1.amazonaws.com/httpd-repo"
+        name        = "website-template-1"
+        image       = "027053845110.dkr.ecr.eu-central-1.amazonaws.com/website-template-1" #change the ecr name for proftask
         essential   = true
 
         portMappings = [{
@@ -90,7 +90,43 @@ resource "aws_ecs_task_definition" "apache_template" {
         logConfiguration = {
             logDriver = "awslogs"
             options = {
-                "awslogs-group"         = "/ecs/apache-web"
+                "awslogs-group"         = "/ecs/website-template-1"
+                "awslogs-region"        = "eu-central-1"
+                "awslogs-stream-prefix" = "ecs"
+            }
+        }
+    }])
+}
+
+resource "aws_ecs_task_definition" "website-template-2" {
+    family                      = "website-template-2"
+    requires_compatibilities    = ["FARGATE"]
+    network_mode                = "awsvpc"
+    cpu                         = 256
+    memory                      = 512
+    task_role_arn               = aws_iam_role.ecs_task_role.arn
+    execution_role_arn          = aws_iam_role.ecs_task_execution.arn
+
+    container_definitions = jsonencode([{
+        name        = "website-template-2"
+        image       = "027053845110.dkr.ecr.eu-central-1.amazonaws.com/website-template-2" #change the ecr name for proftask
+        essential   = true
+
+        portMappings = [{
+            containerPort   = 80
+            hostPort        = 80
+            protocol        = "tcp"
+        }]
+        
+        # Github actions will inject the S3 URL upon runtime
+        environment = [
+            {name = "CONFIG_URL", value = ""}
+        ]
+
+        logConfiguration = {
+            logDriver = "awslogs"
+            options = {
+                "awslogs-group"         = "/ecs/website-template-2"
                 "awslogs-region"        = "eu-central-1"
                 "awslogs-stream-prefix" = "ecs"
             }

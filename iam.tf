@@ -93,10 +93,6 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
   role       = aws_iam_role.lambda.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
-
-# ==========================================
-# 1. THE TASK ROLE (Container Application Code Identity)
-# ==========================================
 resource "aws_iam_role" "ecs_task_role" {
   name = "hybrid-ecs-task-role"
 
@@ -134,10 +130,6 @@ resource "aws_iam_role_policy_attachment" "attach_teardown" {
   policy_arn = aws_iam_policy.backend_teardown.arn
 }
 
-
-# ==========================================
-# 2. THE EXECUTION ROLE (ECS Agent Framework Identity)
-# ==========================================
 resource "aws_iam_role" "ecs_task_execution" {
   name = "backend-task-execution-role"
   assume_role_policy = jsonencode({
@@ -162,10 +154,7 @@ resource "aws_iam_role_policy_attachment" "backend_ssm_attach" {
   policy_arn = aws_iam_policy.backend_ssm_policy.arn
 }
 
-
-# ==========================================
-# 3. POLICIES (Standalone declarations)
-# ==========================================
+# Allows backend to kill active ECS tasks
 resource "aws_iam_policy" "backend_teardown" {
   name        = "nexus-backend-teardown-policy"
   path        = "/"
@@ -173,6 +162,7 @@ resource "aws_iam_policy" "backend_teardown" {
   policy      = data.aws_iam_policy_document.backend_teardown_policy.json
 }
 
+# Allows AWS resources to access GitHub keys
 resource "aws_iam_policy" "backend_ssm_policy" {
   name        = "backend-ssm-access"
   description = "Allow backend infrastructure layers to retrieve GitHub deployment keys"
@@ -186,7 +176,10 @@ resource "aws_iam_policy" "backend_ssm_policy" {
           "ssm:GetParameter"
         ]
         Effect   = "Allow"
-        Resource = "arn:aws:ssm:eu-central-1:027053845110:parameter/hybrid-cloud/github-token"
+        Resource = [
+        "arn:aws:ssm:eu-central-1:027053845110:parameter/hybrid-cloud/github-token",
+        "arn:aws:ssm:eu-central-1:027053845110:parameter/*"
+        ]
       },
       {
         Action   = ["kms:Decrypt"]
@@ -230,4 +223,3 @@ resource "aws_iam_role_policy" "s3_sync_policy" {
     ]
   })
 }
-

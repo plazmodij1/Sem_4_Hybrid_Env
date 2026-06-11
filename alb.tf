@@ -32,7 +32,7 @@ resource "aws_lb_target_group" "lambda" {
 
 # Target Group for the Frontend (Port 80)
 resource "aws_lb_target_group" "user_frontend" {
-  name        = "frontend-tg"
+  name        = "hybrid-user-tg"
   port        = 80
   protocol    = "HTTP"
   vpc_id      = aws_vpc.public.id
@@ -122,7 +122,7 @@ resource "aws_lb_listener_rule" "admin_routing" {
   }
 }
 
-resource "aws_lb_listerner_rule" "user_routing" {
+resource "aws_lb_listener_rule" "user_routing" {
   listener_arn = aws_lb_listener.portal_listener.arn
   priority     = 200
 

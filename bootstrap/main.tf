@@ -110,12 +110,18 @@ resource "aws_route53_zone" "fontys_zone" {
   name = "fontys-proftask.lat"
   
   tags = {
-    Name = "Fontys_Zone"
+    Name = "Fontys Zone"
   }
 }
 
-resource "aws_ecr_repository" "httpd_repo" {
-  name                 = "httpd-repo"
+resource "aws_ecr_repository" "apache_template_1" {
+  name                 = "website-template-1"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true 
+}
+
+resource "aws_ecr_repository" "apache_template_2" {
+  name                 = "website-template-2"
   image_tag_mutability = "MUTABLE"
   force_delete         = true 
 }
