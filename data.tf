@@ -47,3 +47,53 @@ data "aws_iam_policy_document" "github_assume_role" {
     }
   }
 }
+
+# Permissions required by the Python Boto3 backend
+data "aws_iam_policy_document" "backend_teardown_policy" {
+  
+  # Compute Layer: Required to map, inspect, and kill transient Fargate containers
+  statement {
+    sid = "ECSTaskDiscovery"
+    actions = [
+      "ecs:ListTasks",
+      "ecs:DescribeTasks"
+    ]
+    resources = ["*"] 
+  }
+
+  statement {
+    sid = "ECSTaskTermination"
+    actions = [
+      "ecs:StopTask"
+    ]
+    # Scopes container killing authority strictly to tasks running in your deployment region
+    resources = ["arn:aws:ecs:eu-central-1:*:task/*"] 
+  }
+
+  # Network Layer: Required to discover, dissociate, and clear load balancer ingress rules
+  statement {
+    sid = "ALBRuleInspection"
+    actions = [
+      "elasticloadbalancing:DescribeRules"
+    ]
+    resources = ["*"] # Describe APIs require global or full-listener boundaries to execute scans
+  }
+
+  statement {
+    sid = "ALBRuleDeletion"
+    actions = [
+      "elasticloadbalancing:DeleteRule"
+    ]
+    # Matches dynamic listener rule ARN formats generated on your Application Load Balancer
+    resources = ["arn:aws:elasticloadbalancing:eu-central-1:*:listener-rule/app/*/*/*/*"]
+  }
+
+  statement {
+    sid = "ALBTargetGroupDeletion"
+    actions = [
+      "elasticloadbalancing:DeleteTargetGroup"
+    ]
+    # Only allows deleting sandbox groups.
+    resources = ["arn:aws:elasticloadbalancing:eu-central-1:*:targetgroup/tg-*/*"]
+  }
+}

@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hybrid Container Portal</title>
+    <title>Hybrid Container Portal - Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen p-8">
 
     <div class="max-w-4xl mx-auto space-y-8">
         <header class="border-b border-gray-700 pb-4">
-            <h1 class="text-3xl font-bold text-blue-400">Hybrid Container Self-Service</h1>
-            <p class="text-gray-400 mt-1">Deploy and manage containers across AWS and On-Premises environments</p>
+            <h1 class="text-3xl font-bold text-orange-400">Admin Control Panel</h1>
+            <p class="text-gray-400 mt-1">Full infrastructure and configuration management</p>
         </header>
 
         <div id="statusAlert" class="hidden bg-green-800 border border-green-600 text-green-100 px-4 py-3 rounded relative" role="alert">
             <strong class="font-bold">Success!</strong>
-            <span class="block sm:inline" id="statusMessage">Your container is being provisioned.</span>
+            <span class="block sm:inline" id="statusMessage">Action completed.</span>
             <div class="mt-2 text-sm" id="statusLinkBox"></div>
         </div>
 
@@ -27,7 +27,7 @@
                 <form id="deployForm" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium mb-1">User ID</label>
-                        <input type="text" id="deployUser" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white" value="Marko" required>
+                        <input type="text" id="deployUser" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white" value="admin_01" required>
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-1">Container Template</label>
@@ -78,7 +78,7 @@
     </div>
 
     <script>
-        const API_BASE_URL = "api";
+        const API_BASE_URL = "/api";
         const DOMAIN_SUFFIX = "sandbox.fontys-proftask.lat";
 
         function showAlert(message, link = null, isError = false) {
@@ -93,43 +93,38 @@
             msgBox.innerText = message;
             
             if (link) {
-                linkBox.innerHTML = `Environment URL: <a href="${link}" target="_blank" class="underline text-blue-300 hover:text-blue-200">${link}</a> <br><span class="text-xs text-gray-300">(Note: It may take ~30 seconds for AWS Fargate to boot and DNS to resolve)</span>`;
+                linkBox.innerHTML = `Environment URL: <a href="${link}" target="_blank" class="underline text-blue-300 hover:text-blue-200">${link}</a>`;
             } else {
                 linkBox.innerHTML = '';
             }
         }
 
-        // 1. Handle Deploy
+        // Handle Deploy
         document.getElementById('deployForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const customName = document.getElementById('deployName').value.toLowerCase();
             const payload = {
                 user_id: document.getElementById('deployUser').value,
-                role: "user",
+                role: "admin",
                 container_template: document.getElementById('deployTemplate').value,
                 custom_name: customName
             };
 
             try {
-                // Assuming your backend route is /api/deployments for POST
                 const response = await fetch(`${API_BASE_URL}/deploy`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                
                 if (!response.ok) throw new Error(await response.text());
-                
                 const expectedUrl = `http://${customName}.${DOMAIN_SUFFIX}`;
                 showAlert('Deployment Triggered! AWS is currently provisioning your infrastructure.', expectedUrl);
-                
             } catch (error) {
-                console.error('Deployment Error:', error);
                 showAlert(`Deployment Failed: ${error.message}`, null, true);
             }
         });
 
-        // 2. Handle Admin Update
+        // Handle Admin Update
         document.getElementById('updateForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const payload = {
@@ -157,13 +152,12 @@
             }
         });
 
-        // 3. Handle Teardown (NEW)
+        // Handle Teardown
         document.getElementById('deleteForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const containerName = document.getElementById('deleteTargetName').value;
-            // Assuming we hardcode user and role for the portal demo, or fetch from auth state
-            const userId = "Marko"; 
-            const role = "user";
+            const userId = "admin_01"; 
+            const role = "admin";
 
             if(!confirm(`Are you absolutely sure you want to destroy ${containerName}? This cannot be undone.`)) return;
 
@@ -171,10 +165,9 @@
                 const response = await fetch(`${API_BASE_URL}/deployments/${containerName}?user_id=${userId}&role=${role}`, {
                     method: 'DELETE'
                 });
-                
                 if (!response.ok) throw new Error(await response.text());
-                showAlert(`Successfully destroyed ${containerName}. Load balancer rules and ECS tasks have been terminated.`);
-                document.getElementById('deleteTargetName').value = ''; // clear input
+                showAlert(`Successfully destroyed ${containerName}.`);
+                document.getElementById('deleteTargetName').value = '';
             } catch (error) {
                 showAlert(`Teardown Failed: ${error.message}`, null, true);
             }

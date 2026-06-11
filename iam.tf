@@ -94,11 +94,13 @@ resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
 
-# The role container has while running
+# ==========================================
+# 1. THE TASK ROLE (Container Application Code Identity)
+# ==========================================
 resource "aws_iam_role" "ecs_task_role" {
   name = "hybrid-ecs-task-role"
 
-assume_role_policy = jsonencode({
+  assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
       Action = "sts:AssumeRole"
@@ -108,7 +110,7 @@ assume_role_policy = jsonencode({
   })
 }
 
-# Read only access for task role to S3 bucket 
+# Read-only access for task role to S3 bucket 
 resource "aws_iam_role_policy" "s3_read_policy" {
   name = "s3-config-read-access"
   role = aws_iam_role.ecs_task_role.id
@@ -126,17 +128,16 @@ resource "aws_iam_role_policy" "s3_read_policy" {
   })
 }
 
-# The execution role (allows ECS to pull images from DockerHub and write logs)
-resource "aws_iam_role" "ecs_execution_role" {
-  name = "hybrid-ecs-execution-role"
-  assume_role_policy = aws_iam_role.ecs_task_role.assume_role_policy
+# Attach our custom ALB/Target Group teardown rules to the application execution space
+resource "aws_iam_role_policy_attachment" "attach_teardown" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.backend_teardown.arn
 }
 
-resource "aws_iam_role_policy_attachment" "ecs_execution_policy" {
-  role       = aws_iam_role.ecs_execution_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
 
+# ==========================================
+# 2. THE EXECUTION ROLE (ECS Agent Framework Identity)
+# ==========================================
 resource "aws_iam_role" "ecs_task_execution" {
   name = "backend-task-execution-role"
   assume_role_policy = jsonencode({
@@ -149,9 +150,32 @@ resource "aws_iam_role" "ecs_task_execution" {
   })
 }
 
+# Standard managed policy for pulling ECR images and emitting CloudWatch streams
+resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# Allows ECS to pull the GitHub Token from SSM Parameter Store during container initialization
+resource "aws_iam_role_policy_attachment" "backend_ssm_attach" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = aws_iam_policy.backend_ssm_policy.arn
+}
+
+
+# ==========================================
+# 3. POLICIES (Standalone declarations)
+# ==========================================
+resource "aws_iam_policy" "backend_teardown" {
+  name        = "nexus-backend-teardown-policy"
+  path        = "/"
+  description = "Provides the FastAPI self-service platform authority to scrub dynamic network lanes and kill active user tasks."
+  policy      = data.aws_iam_policy_document.backend_teardown_policy.json
+}
+
 resource "aws_iam_policy" "backend_ssm_policy" {
   name        = "backend-ssm-access"
-  description = "Allow backend to pull GitHub token from SSM"
+  description = "Allow backend infrastructure layers to retrieve GitHub deployment keys"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -162,7 +186,7 @@ resource "aws_iam_policy" "backend_ssm_policy" {
           "ssm:GetParameter"
         ]
         Effect   = "Allow"
-        Resource = "arn:aws:ssm:eu-central-1:027053845110:parameter/hybrid-cloud/github-token" #CHANGE THE ACCOUNT ID
+        Resource = "arn:aws:ssm:eu-central-1:027053845110:parameter/hybrid-cloud/github-token"
       },
       {
         Action   = ["kms:Decrypt"]
@@ -171,16 +195,6 @@ resource "aws_iam_policy" "backend_ssm_policy" {
       }
     ]
   })
-}
-
-resource "aws_iam_role_policy_attachment" "backend_ssm_attach" {
-  role       = aws_iam_role.ecs_task_execution.name
-  policy_arn = aws_iam_policy.backend_ssm_policy.arn
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
-  role       = aws_iam_role.ecs_task_execution.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 # Github role to access S3 bucket

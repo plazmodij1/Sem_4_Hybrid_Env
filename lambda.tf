@@ -54,6 +54,7 @@ resource "aws_lambda_function" "alb_dynamic_registrar" {
     variables = {
       ALB_LISTENER_ARN = aws_lb_listener.portal_listener.arn
       VPC_ID = aws_vpc.public.id
+      DOMAIN_SUFFIX = "sandbox.fontys-proftask.lat"
     }
   }
 

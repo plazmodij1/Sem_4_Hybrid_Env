@@ -39,3 +39,22 @@ resource "aws_cloudwatch_event_target" "lambda_target" {
   arn       = aws_lambda_function.alb_dynamic_registrar.arn
 }
 
+resource "aws_cloudwatch_log_group" "apache_logs" {
+  name              = "/ecs/apache-web"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "backend_logs" {
+  name              = "/ecs/fastapi-backend"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "user_frontend" {
+  name              = "/ecs/hybrid-user-frontend"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "admin_frontend" {
+  name              = "/ecs/hybrid-admin-frontend"
+  retention_in_days = 7
+}

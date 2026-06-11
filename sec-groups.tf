@@ -103,3 +103,23 @@ resource "aws_security_group_rule" "fck_nat_allow_private" {
   # This targets the security group outputted by the module
   security_group_id = module.fck_nat.security_group_id
 }
+
+resource "aws_security_group" "frontend_tasks" {
+name        = "hybrid-frontend-tasks-sg"
+  description = "Allow inbound access from ALB only"
+  vpc_id      = aws_vpc.private.id
+
+  ingress {
+    protocol        = "tcp"
+    from_port       = 80
+    to_port         = 80
+    security_groups = [aws_security_group.alb_sg.id] 
+  }
+
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}

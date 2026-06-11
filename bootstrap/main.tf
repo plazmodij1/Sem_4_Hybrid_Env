@@ -126,8 +126,22 @@ resource "aws_ecr_repository" "fastapi_backend" {
   force_delete         = true 
 }
 
-resource "aws_ecr_repository" "frontend-ui" {
-  name = "frontend-ui"
+resource "aws_ecr_repository" "user_frontend" {
+  name                 = "hybrid-user-frontend"
   image_tag_mutability = "MUTABLE"
-  force_delete = true
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
+
+resource "aws_ecr_repository" "admin_frontend" {
+  name                 = "hybrid-admin-frontend"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
 }

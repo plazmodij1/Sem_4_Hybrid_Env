@@ -49,7 +49,6 @@ def lambda_handler(event, context):
                     'assignPublicIp': 'DISABLED'     
                 }
             },
-            enableECSManagedTags=True,
             overrides={
                 'containerOverrides': [
                     {

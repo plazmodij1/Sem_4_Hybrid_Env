@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
@@ -21,6 +21,8 @@ FRONTEND_URL = os.getenv("FRONTEND_CORS_ORIGIN", "http://localhost:8080")
 
 tagging_client = boto3.client('resourcegroupstaggingapi', region_name='eu-central-1')
 ecs_client = boto3.client('ecs', region_name='eu-central-1')
+elbv2_client = boto3.client('elbv2')
+
 
 class DeployRequest(BaseModel):
     user_id: str
@@ -102,6 +104,76 @@ async def update_configuration(payload: AdminUpdateRequest):
         "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
     }
+    
+    container_name = payload.container_name
+
+    cluster_name = os.getenv("ECS_CLUSTER_NAME", "your-cluster-name")
+    alb_listener_arn = os.getenv("ALB_LISTENER_ARN")
+    domain_suffix = os.getenv("DOMAIN_SUFFIX", "sandbox.fontys-proftask.lat")
+
+    # ==========================================================
+    # STEP 1: PRE-UPDATE CLEANUP (Wipe old network & compute)
+    # ==========================================================
+    try:
+        if alb_listener_arn:
+            target_host = f"{container_name}.{domain_suffix}"
+            target_group_arn = None
+            rule_arn = None
+
+            print(f"[Update Workflow] Clearing out old networking for: {target_host}")
+
+            # Find the existing ALB rule matching this host header
+            rules_response = elbv2_client.describe_rules(ListenerArn=alb_listener_arn)
+            for rule in rules_response.get('Rules', []):
+                for condition in rule.get('Conditions', []):
+                    if condition.get('Field') == 'host-header':
+                        if target_host in condition.get('HostHeaderConfig', {}).get('Values', []):
+                            rule_arn = rule['RuleArn']
+                            for action in rule.get('Actions', []):
+                                if action.get('Type') == 'forward':
+                                    target_group_arn = action.get('TargetGroupArn')
+                                    break
+
+            # Delete old rule
+            if rule_arn:
+                print(f"[Update Workflow] Deleting old ALB Rule: {rule_arn}")
+                elbv2_client.delete_rule(RuleArn=rule_arn)
+                import time
+                time.sleep(1) # Give AWS a brief window to process dissociation
+
+            # Delete old target group
+            if target_group_arn:
+                print(f"[Update Workflow] Deleting old Target Group: {target_group_arn}")
+                elbv2_client.delete_target_group(TargetGroupArn=target_group_arn)
+
+    except Exception as e:
+        print(f"[Update Workflow] Warning during network cleanup: {str(e)}")
+
+    try:
+        # Find and terminate the old running ECS task
+        print(f"[Update Workflow] Finding active container instance for '{container_name}' to terminate...")
+        paginator = ecs_client.get_paginator('list_tasks')
+        all_task_arns = []
+        for page in paginator.paginate(cluster=cluster_name, desiredStatus='RUNNING'):
+            all_task_arns.extend(page.get('taskArns', []))
+
+        if all_task_arns:
+            for i in range(0, len(all_task_arns), 100):
+                batch = all_task_arns[i:i+100]
+                describe_response = ecs_client.describe_tasks(cluster=cluster_name, tasks=batch, include=['TAGS'])
+                
+                for task in describe_response.get('tasks', []):
+                    tags = {tag['key']: tag['value'] for tag in task.get('tags', [])}
+                    if tags.get('ContainerName') == container_name:
+                        print(f"[Update Workflow] Terminating old ECS Task: {task['taskArn']}")
+                        ecs_client.stop_task(
+                            cluster=cluster_name,
+                            task=task['taskArn'],
+                            reason="System recycling instance for configuration update"
+                        )
+                        break
+    except Exception as e:
+        print(f"[Update Workflow] Warning during compute termination: {str(e)}")
 
     # 2. Fetch the current configuration from GitHub
     get_response = requests.get(get_url, headers=headers)
@@ -140,21 +212,70 @@ async def update_configuration(payload: AdminUpdateRequest):
         }
     else:
         raise HTTPException(status_code=put_response.status_code, detail=put_response.text)
-    
 
 @app.delete("/api/deployments/{container_name}")
 async def delete_container(container_name: str, user_id: str, role: str):
     """
-    Terminates the ECS container and deletes the GitOps state file.
+    Tears down the ALB routing, terminates the ECS container, and deletes the GitOps state file.
     """
-    # 1. Enforce RBAC (Basic validation)
+    # Enforce RBAC (Basic validation)
     if role not in ["user", "admin"]:
         raise HTTPException(status_code=403, detail="Unauthorized role.")
 
     cluster_name = os.getenv("ECS_CLUSTER_NAME", "your-cluster-name")
+    alb_listener_arn = os.getenv("ALB_LISTENER_ARN")
+    domain_suffix = os.getenv("DOMAIN_SUFFIX", "sandbox.fontys-proftask.lat")
 
     # ==========================================
-    # PHASE 1: Terminate Compute (AWS ECS)
+    # PHASE 1: Network Teardown (ALB & Target Group)
+    # ==========================================
+    try:
+        if alb_listener_arn:
+            target_host = f"{container_name}.{domain_suffix}"
+            target_group_arn = None
+            rule_arn = None
+
+            print(f"Starting network teardown for: {target_host}")
+
+            # 1. Fetch all rules on the Listener
+            rules_response = elbv2_client.describe_rules(ListenerArn=alb_listener_arn)
+            
+            # 2. Locate the specific rule matching the user's custom hostname
+            for rule in rules_response.get('Rules', []):
+                for condition in rule.get('Conditions', []):
+                    if condition.get('Field') == 'host-header':
+                        if target_host in condition.get('HostHeaderConfig', {}).get('Values', []):
+                            rule_arn = rule['RuleArn']
+                            
+                            # Extract the attached Target Group ARN
+                            for action in rule.get('Actions', []):
+                                if action.get('Type') == 'forward':
+                                    target_group_arn = action.get('TargetGroupArn')
+                                    break
+
+            # 3. Delete the Listener Rule FIRST
+            if rule_arn:
+                print(f"Deleting ALB Rule: {rule_arn}")
+                elbv2_client.delete_rule(RuleArn=rule_arn)
+            else:
+                print(f"Warning: No ALB Rule found for {target_host}")
+
+            # 4. Delete the Target Group SECOND
+            if target_group_arn:
+                print(f"Deleting Target Group: {target_group_arn}")
+                elbv2_client.delete_target_group(TargetGroupArn=target_group_arn)
+            else:
+                print(f"Warning: No Target Group found attached to rule.")
+        else:
+            print("Warning: ALB_LISTENER_ARN is not set. Skipping network teardown.")
+
+    except Exception as e:
+        # Catch network errors but do not block the compute/state teardown
+        print(f"ALB Teardown Error: {str(e)}")
+
+
+    # ==========================================
+    # PHASE 2: Terminate Compute (AWS ECS)
     # ==========================================
     try:
         # 1. Bypass the SCP: Get all running tasks natively from your ECS cluster
@@ -200,8 +321,9 @@ async def delete_container(container_name: str, user_id: str, role: str):
     except Exception as e:
         print(f"ECS Termination Error: {str(e)}")
 
+
     # ==========================================
-    # PHASE 2: Clean State (GitHub GitOps)
+    # PHASE 3: Clean State (GitHub GitOps)
     # ==========================================
     file_path = f"deployments/{container_name}.json"
     url = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}/contents/{file_path}"
