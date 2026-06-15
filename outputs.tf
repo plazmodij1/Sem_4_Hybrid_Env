@@ -13,4 +13,3 @@ output "onprem_url" {
 output "fontys_domain" {
   value = "http://fontys-proftask.lat"
 }
-

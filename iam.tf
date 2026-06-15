@@ -1,13 +1,90 @@
-# IAM role for the Lambda function to allow basic execution and service access
+# IAM role and policy for the Lambda function
 resource "aws_iam_role" "lambda" {
-  name = "main-lambda-role"
+  name = "LambdaECSOrchestratorRole"
   assume_role_policy = jsonencode({
-    "Version" : "2012-10-17",
-    "Statement" : [{
-      Action    = "sts:AssumeRole",
-      Effect    = "Allow",
-      Principal = { Service = "lambda.amazonaws.com" }
-    }]
+    Version = "2012-10-17",
+    Statement = [{ 
+      Action = "sts:AssumeRole",
+      Effect = "Allow",
+      Principal = { Service = "lambda.amazonaws.com" } }]
+  })
+}
+
+resource "aws_iam_role_policy" "lambda_ecs_policy" {
+  name = "LambdaECSOperations"
+  role = aws_iam_role.lambda.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      { 
+        Effect = "Allow", 
+        Action = [
+          "logs:CreateLogGroup", 
+          "logs:CreateLogStream", 
+          "logs:PutLogEvents"
+        ],
+        Resource = "arn:aws:logs:*:*:*" 
+      },
+      { 
+        Effect = "Allow", 
+        Action = ["s3:GetObject"], 
+        Resource = "arn:aws:s3:::fontys-marko-config-master/*" #change to proftask s3 bucket name
+      }, 
+      { 
+        Effect = "Allow", 
+        Action = [
+          "ecs:RunTask", 
+          "ecs:TagResource"
+        ],
+        Resource = "*" 
+      },
+      { 
+        Effect = "Allow", 
+        Action = ["iam:PassRole"], 
+        Resource = "*" 
+      } 
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "lambda_alb_policy" {
+  name = "LambdaALBAccess"
+  role = aws_iam_role.lambda.id
+  policy = jsonencode({
+    Version = "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "logs:CreateLogGroup",
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:*:*:*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "elasticloadbalancing:CreateTargetGroup",
+                "elasticloadbalancing:DeleteTargetGroup",
+                "elasticloadbalancing:RegisterTargets",
+                "elasticloadbalancing:DeregisterTargets",
+                "elasticloadbalancing:CreateRule",
+                "elasticloadbalancing:DeleteRule",
+                "elasticloadbalancing:DescribeRules",
+                "elasticloadbalancing:DescribeTargetGroups"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ecs:DescribeTasks",
+                "ecs:ListTasks"
+            ],
+            "Resource": "*"
+        }
+    ]
   })
 }
 
@@ -15,4 +92,134 @@ resource "aws_iam_role" "lambda" {
 resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
   role       = aws_iam_role.lambda.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+}
+resource "aws_iam_role" "ecs_task_role" {
+  name = "hybrid-ecs-task-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+    }]
+  })
+}
+
+# Read-only access for task role to S3 bucket 
+resource "aws_iam_role_policy" "s3_read_policy" {
+  name = "s3-config-read-access"
+  role = aws_iam_role.ecs_task_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action   = ["s3:GetObject", "s3:ListBucket"]
+      Effect   = "Allow"
+      Resource = [
+          data.aws_s3_bucket.main.arn,
+          "${data.aws_s3_bucket.main.arn}/*"
+      ]
+    }]
+  })
+}
+
+# Attach our custom ALB/Target Group teardown rules to the application execution space
+resource "aws_iam_role_policy_attachment" "attach_teardown" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.backend_teardown.arn
+}
+
+resource "aws_iam_role" "ecs_task_execution" {
+  name = "backend-task-execution-role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = { Service = "ecs-tasks.amazonaws.com" }
+    }]
+  })
+}
+
+# Standard managed policy for pulling ECR images and emitting CloudWatch streams
+resource "aws_iam_role_policy_attachment" "ecs_task_execution_role_policy" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+# Allows ECS to pull the GitHub Token from SSM Parameter Store during container initialization
+resource "aws_iam_role_policy_attachment" "backend_ssm_attach" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = aws_iam_policy.backend_ssm_policy.arn
+}
+
+# Allows backend to kill active ECS tasks
+resource "aws_iam_policy" "backend_teardown" {
+  name        = "nexus-backend-teardown-policy"
+  path        = "/"
+  description = "Provides the FastAPI self-service platform authority to scrub dynamic network lanes and kill active user tasks."
+  policy      = data.aws_iam_policy_document.backend_teardown_policy.json
+}
+
+# Allows AWS resources to access GitHub keys
+resource "aws_iam_policy" "backend_ssm_policy" {
+  name        = "backend-ssm-access"
+  description = "Allow backend infrastructure layers to retrieve GitHub deployment keys"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "ssm:GetParameters",
+          "ssm:GetParameter"
+        ]
+        Effect   = "Allow"
+        Resource = [
+        "arn:aws:ssm:eu-central-1:027053845110:parameter/hybrid-cloud/github-token",
+        "arn:aws:ssm:eu-central-1:027053845110:parameter/*"
+        ]
+      },
+      {
+        Action   = ["kms:Decrypt"]
+        Effect   = "Allow"
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Github role to access S3 bucket
+resource "aws_iam_role" "github_actions_s3_role" {
+  name = "GitHubActionsS3SyncRole"
+  assume_role_policy = data.aws_iam_policy_document.github_assume_role.json
+}
+
+resource "aws_iam_role_policy" "s3_sync_policy" {
+  name = "S3MasterBucketSyncPolicy"
+  role = aws_iam_role.github_actions_s3_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation"
+        ]
+        Resource = "arn:aws:s3:::fontys-marko-config-master" #change to group s3 bucket name
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "arn:aws:s3:::fontys-marko-config-master/*" #change to group s3 bucket name
+      }
+    ]
+  })
 }
