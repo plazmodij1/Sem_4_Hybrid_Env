@@ -1,7 +1,3 @@
-data"aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
-}
-
 data "archive_file" "lambda_zip_orch" {
   type        = "zip"
   source_file  = "${path.module}/lambda_orchestrator/lambda_function.py"
@@ -24,7 +20,7 @@ data "aws_route53_zone" "fontys_zone" {
 }
 
 data "aws_s3_bucket" "main" {
-  bucket = "fontys-marko-terraform-state-bucket"
+  bucket = "fontys-terraform-state-bucket"
 }
 
 # Assume role policy for the "deployments" branch in Github repo
@@ -33,7 +29,7 @@ data "aws_iam_policy_document" "github_assume_role" {
     actions = ["sts:AssumeRoleWithWebIdentity"]
     principals {
       type = "Federated"
-      identifiers = [data.aws_iam_openid_connect_provider.github.arn] 
+      identifiers = [aws_iam_openid_connect_provider.github.arn] 
     }
     condition {
       test = "StringEquals"

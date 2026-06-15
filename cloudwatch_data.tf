@@ -87,7 +87,7 @@ resource "aws_cloudwatch_event_rule" "s3_json_upload" {
     source      = ["aws.s3"]
     detail-type = ["Object Created"]
     detail = {
-      bucket = { name = ["fontys-marko-config-master"] } #change to proftask s3 bucket
+      bucket = { name = ["fontys-config-master"] } #change to proftask s3 bucket
       object = { key = [{ suffix = ".json" }] }
     }
   })

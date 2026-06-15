@@ -5,7 +5,7 @@ provider "aws" {
 # TERRAFORM BACKEND CONFIGURATION
 terraform {
   backend "s3" {
-    bucket = "fontys-marko-terraform-state-bucket"
+    bucket = "fontys-terraform-state-bucket"
     key    = "hybrid-cloud/terraform.tfstate"
     region = "eu-central-1"
     encrypt = true

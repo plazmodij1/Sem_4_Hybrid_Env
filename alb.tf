@@ -104,21 +104,23 @@ resource "aws_lb_listener_rule" "admin_routing" {
   }
 }
 
-#resource "aws_lb_listener_rule" "user_routing" {
-#  listener_arn = aws_lb_listener.portal_listener.arn
-#  priority     = 200
-#
-#  action {
-#    type             = "forward"
-#    target_group_arn = aws_lb_target_group.user_frontend.arn
-#  }
-#
-#  condition {
-#    path_pattern {
-#      values = ["/*"]
-#    }
-#  }
-#}
+resource "aws_lb_listener_rule" "user_routing" {
+  listener_arn = aws_lb_listener.portal_listener.arn
+  priority     = 200
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.user_frontend.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/*"]
+    }
+  }
+}
+
+
 
 # Listener Rule for the API
 resource "aws_lb_listener_rule" "api_routing" {

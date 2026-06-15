@@ -28,7 +28,7 @@ resource "aws_iam_role_policy" "lambda_ecs_policy" {
       { 
         Effect = "Allow", 
         Action = ["s3:GetObject"], 
-        Resource = "arn:aws:s3:::fontys-marko-config-master/*" #change to proftask s3 bucket name
+        Resource = "arn:aws:s3:::fontys-config-master/*" #change to proftask s3 bucket name
       }, 
       { 
         Effect = "Allow", 
@@ -177,8 +177,8 @@ resource "aws_iam_policy" "backend_ssm_policy" {
         ]
         Effect   = "Allow"
         Resource = [
-        "arn:aws:ssm:eu-central-1:027053845110:parameter/hybrid-cloud/github-token",
-        "arn:aws:ssm:eu-central-1:027053845110:parameter/*"
+        "arn:aws:ssm:eu-central-1:318270725890:parameter/hybrid-cloud/github-token",
+        "arn:aws:ssm:eu-central-1:318270725890:parameter/*"
         ]
       },
       {
@@ -209,7 +209,7 @@ resource "aws_iam_role_policy" "s3_sync_policy" {
           "s3:ListBucket",
           "s3:GetBucketLocation"
         ]
-        Resource = "arn:aws:s3:::fontys-marko-config-master" #change to group s3 bucket name
+        Resource = "arn:aws:s3:::fontys-config-master" #change to group s3 bucket name
       },
       {
         Effect = "Allow"
@@ -218,7 +218,7 @@ resource "aws_iam_role_policy" "s3_sync_policy" {
           "s3:GetObject",
           "s3:DeleteObject"
         ]
-        Resource = "arn:aws:s3:::fontys-marko-config-master/*" #change to group s3 bucket name
+        Resource = "arn:aws:s3:::fontys-config-master/*" #change to group s3 bucket name
       }
     ]
   })

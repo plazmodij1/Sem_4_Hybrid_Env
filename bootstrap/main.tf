@@ -9,7 +9,7 @@ provider "aws" {
 
 # S3 BUCKET FOR TERRAFORM STATE
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "fontys-marko-terraform-state-bucket" # Change into the proftask s3 bucket
+  bucket = "fontys-terraform-state-bucket" # Change into the proftask s3 bucket
 
   tags = {
     Name        = "Terraform State Bucket"
@@ -65,7 +65,7 @@ resource "aws_dynamodb_table" "terraform_lock" {
 
 # Second S3 bucket for the container config files
 resource "aws_s3_bucket" "config_master" {
-  bucket        = "fontys-marko-config-master" # Change into the proftask s3 bucket
+  bucket        = "fontys-config-master" # Change into the proftask s3 bucket
   force_destroy = false
 
   tags = {
