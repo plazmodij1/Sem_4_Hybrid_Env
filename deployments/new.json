@@ -2,7 +2,7 @@
   "container_name": "new",
   "user_id": "new",
   "template_id": "website-template-1",
-  "routing_url": "new.sandbox.fontys-proftask.lat",
+  "routing_url": "new.IP_ADDRESS.nip.io:3055",
   "target_environment": "aws",
   "injected_parameters": {
     "image": "nginx:latest",
