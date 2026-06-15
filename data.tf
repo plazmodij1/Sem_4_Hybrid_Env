@@ -97,3 +97,7 @@ data "aws_iam_policy_document" "backend_teardown_policy" {
     resources = ["arn:aws:elasticloadbalancing:eu-central-1:*:targetgroup/tg-*/*"]
   }
 }
+
+data "aws_alb" "alb_url" {
+  name = "main-alb"
+}
