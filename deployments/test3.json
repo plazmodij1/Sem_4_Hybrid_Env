@@ -6,6 +6,6 @@
   "target_environment": "aws",
   "injected_parameters": {
     "image": "nginx:latest",
-    "listen_port": "80"
+    "listen_port": "1234"
   }
 }
