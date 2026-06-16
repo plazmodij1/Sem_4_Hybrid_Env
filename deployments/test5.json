@@ -1,0 +1,11 @@
+{
+  "container_name": "test5",
+  "user_id": "test",
+  "template_id": "website-template-1",
+  "routing_url": "test5.sandbox.fontys-proftask.lat",
+  "target_environment": "aws",
+  "injected_parameters": {
+    "image": "nginx:latest",
+    "listen_port": "80"
+  }
+}
