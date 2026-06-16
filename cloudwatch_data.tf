@@ -144,3 +144,13 @@ resource "aws_cloudwatch_log_group" "admin_frontend" {
   name              = "/ecs/hybrid-admin-frontend"
   retention_in_days = 7
 }
+
+resource "aws_cloudwatch_log_group" "orchestrator" {
+  name              = "/ecs/grafana/GitOps-ECS-Orchestrator"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "alb_dynamic_registrar" {
+  name              = "/ecs/grafana/ALBDynamicRegistaar"
+  retention_in_days = 7
+}

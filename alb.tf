@@ -44,8 +44,8 @@ resource "aws_lb_target_group" "admin_frontend" {
 
   health_check {
     # Nginx expects the health check to include the /admin path
-    path                = "/admin"
-    healthy_threshold   = 2
+    path                = "/admin/"
+    healthy_threshold   = 3
     unhealthy_threshold = 10
   }
 }
@@ -97,9 +97,8 @@ resource "aws_lb_listener_rule" "admin_routing" {
   }
 
   condition {
-    path_pattern {
-      values = ["/*"] 
-      #values = ["/admin*"] 
+    path_pattern { 
+      values = ["/admin*"] 
     }
   }
 }

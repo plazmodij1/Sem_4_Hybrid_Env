@@ -49,6 +49,7 @@ resource "aws_ecs_service" "backend_service" {
     desired_count     = 1
     launch_type       = "FARGATE"
 
+
     network_configuration {
       subnets           = [aws_subnet.private["app"].id]
       security_groups   = [aws_security_group.ecs.id]
