@@ -81,7 +81,7 @@ resource "aws_security_group" "vpc_endpoints" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.private.cidr_block] # Allow internal VPC traffic
+    cidr_blocks = [aws_vpc.private.cidr_block] # Allow   VPC traffic
   }
 
   egress {
@@ -104,3 +104,22 @@ resource "aws_security_group_rule" "fck_nat_allow_private" {
   security_group_id = module.fck_nat.security_group_id
 }
 
+resource "aws_security_group" "fck_nat_custom_ingress" {
+  name = "fck-nat-vpc-allow"
+  description = "Allow internal VPC traffic to Fck-NAT"
+  vpc_id = aws_vpc.public.id
+
+  ingress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = [var.cidr_block_vpc_private, var.cidr_block_vpc_public]
+  }
+
+  egress {
+    from_port = 0
+    to_port = 0
+    protocol = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}

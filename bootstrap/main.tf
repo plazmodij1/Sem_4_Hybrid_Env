@@ -9,7 +9,7 @@ provider "aws" {
 
 # S3 BUCKET FOR TERRAFORM STATE
 resource "aws_s3_bucket" "terraform_state" {
-  bucket = "fontys-marko-terraform-state-bucket" # Change into the proftask s3 bucket
+  bucket = "fontys-terraform-state-bucket" # Change into the proftask s3 bucket
 
   tags = {
     Name        = "Terraform State Bucket"
@@ -65,7 +65,7 @@ resource "aws_dynamodb_table" "terraform_lock" {
 
 # Second S3 bucket for the container config files
 resource "aws_s3_bucket" "config_master" {
-  bucket        = "fontys-marko-config-master" # Change into the proftask s3 bucket
+  bucket        = "fontys-config-master" # Change into the proftask s3 bucket
   force_destroy = false
 
   tags = {
@@ -150,4 +150,14 @@ resource "aws_ecr_repository" "admin_frontend" {
   image_scanning_configuration {
     scan_on_push = true
   }
+}
+
+data "tls_certificate" "github" {
+  url = "https://token.actions.githubusercontent.com/.well-known/openid-configuration"
+}
+
+resource "aws_iam_openid_connect_provider" "github" {
+    url = "https://token.actions.githubusercontent.com"
+    client_id_list  = ["sts.amazonaws.com"]
+    thumbprint_list = ["1b511abead59c6ce207077c0bf0e0043b1382612"]
 }

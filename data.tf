@@ -1,4 +1,4 @@
-data"aws_iam_openid_connect_provider" "github" {
+data "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 }
 
@@ -24,7 +24,7 @@ data "aws_route53_zone" "fontys_zone" {
 }
 
 data "aws_s3_bucket" "main" {
-  bucket = "fontys-marko-terraform-state-bucket"
+  bucket = "fontys-terraform-state-bucket"
 }
 
 # Assume role policy for the "deployments" branch in Github repo

@@ -13,7 +13,7 @@ resource "aws_ecs_task_definition" "backend_task" {
 
   container_definitions = jsonencode([{
     name        = "fastapi-backend-container"
-    image       = "027053845110.dkr.ecr.eu-central-1.amazonaws.com/fastapi-backend"
+    image       = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/fastapi-backend"
     essential   = true
     portMappings = [{
         containerPort   = 8000
@@ -49,6 +49,7 @@ resource "aws_ecs_service" "backend_service" {
     desired_count     = 1
     launch_type       = "FARGATE"
 
+
     network_configuration {
       subnets           = [aws_subnet.private["app"].id]
       security_groups   = [aws_security_group.ecs.id]
@@ -73,7 +74,7 @@ resource "aws_ecs_task_definition" "website-template-1" {
 
     container_definitions = jsonencode([{
         name        = "website-template-1"
-        image       = "027053845110.dkr.ecr.eu-central-1.amazonaws.com/website-template-1" #change the ecr name for proftask
+        image       = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/website-template-1" #change the ecr name for proftask
         essential   = true
 
         portMappings = [{
@@ -109,7 +110,7 @@ resource "aws_ecs_task_definition" "website-template-2" {
 
     container_definitions = jsonencode([{
         name        = "website-template-2"
-        image       = "027053845110.dkr.ecr.eu-central-1.amazonaws.com/website-template-2" #change the ecr name for proftask
+        image       = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/website-template-2" #change the ecr name for proftask
         essential   = true
 
         portMappings = [{

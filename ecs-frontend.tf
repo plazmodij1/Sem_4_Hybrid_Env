@@ -60,7 +60,7 @@ resource "aws_ecs_task_definition" "user_frontend" {
 
   container_definitions = jsonencode([{
     name = "user-panel"
-    image = "027053845110.dkr.ecr.eu-central-1.amazonaws.com/hybrid-user-frontend" #change this for the proftask project
+    image = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/hybrid-user-frontend" #change this for the proftask project
     essential = true
     portMappings = [{
       containerPort = 80
@@ -87,7 +87,7 @@ resource "aws_ecs_task_definition" "admin_frontend" {
 
   container_definitions = jsonencode([{
     name = "admin-panel"
-    image = "027053845110.dkr.ecr.eu-central-1.amazonaws.com/hybrid-admin-frontend" #change this for the proftask project
+    image = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/hybrid-admin-frontend" #change this for the proftask project
     essential = true
     portMappings = [{
       containerPort = 80
@@ -132,6 +132,7 @@ resource "aws_ecs_service" "admin_frontend" {
   task_definition = aws_ecs_task_definition.admin_frontend.arn
   desired_count = 1
   launch_type = "FARGATE"
+
 
   network_configuration {
     subnets = [aws_subnet.private["app"].id]
