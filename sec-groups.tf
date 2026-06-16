@@ -81,7 +81,7 @@ resource "aws_security_group" "vpc_endpoints" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [aws_vpc.private.cidr_block] # Allow internal VPC traffic
+    cidr_blocks = [aws_vpc.private.cidr_block] # Allow   VPC traffic
   }
 
   egress {
@@ -103,3 +103,4 @@ resource "aws_security_group_rule" "fck_nat_allow_private" {
   # This targets the security group outputted by the module
   security_group_id = module.fck_nat.security_group_id
 }
+
