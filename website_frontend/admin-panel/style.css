@@ -1,0 +1,10 @@
+#updateForm {
+    filter: blur(6px);
+    pointer-events: none;
+    user-select: none;
+}
+#updateForm.unlocked {
+    filter: none;
+    pointer-events: all;
+    user-select: auto;
+}
