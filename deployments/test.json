@@ -1,7 +1,0 @@
-{
-  "custom_name": "test",
-  "container_template": "test",
-  "updated_parameters": {
-    "listen_port": "80"
-  }
-}
