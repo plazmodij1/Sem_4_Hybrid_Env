@@ -25,6 +25,7 @@ resource "aws_lambda_function" "main" {
   }
 }
 
+###################### Lambda ECS Orchestrator rules ######################
 resource "aws_lambda_permission" "alb" {
   statement_id  = "AllowExecutionFromALB"
   action        = "lambda:InvokeFunction"
@@ -40,6 +41,8 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.s3_json_upload.arn
 }
+
+###################### Lambda ALB Dynamic Registrar rules ######################
 
 # Lambda function for provisioning ECS tasks ALB domain
 resource "aws_lambda_function" "alb_dynamic_registrar" {

@@ -82,4 +82,6 @@ module "fck_nat" {
     subnet_id                       = aws_subnet.public["nat-dmz"].id
     instance_type                   = "t3.micro"
     ha_mode                         = true
+
+    additional_security_group_ids = [aws_security_group.fck_nat_custom_ingress.id]
     }

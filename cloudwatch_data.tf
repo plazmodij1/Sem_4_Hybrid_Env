@@ -87,7 +87,7 @@ resource "aws_cloudwatch_event_rule" "s3_json_upload" {
     source      = ["aws.s3"]
     detail-type = ["Object Created"]
     detail = {
-      bucket = { name = ["fontys-config-master"] } #change to proftask s3 bucket
+      bucket = { name = ["fontys-config-master"] }
       object = { key = [{ suffix = ".json" }] }
     }
   })
@@ -142,15 +142,5 @@ resource "aws_cloudwatch_log_group" "user_frontend" {
 
 resource "aws_cloudwatch_log_group" "admin_frontend" {
   name              = "/ecs/hybrid-admin-frontend"
-  retention_in_days = 7
-}
-
-resource "aws_cloudwatch_log_group" "orchestrator" {
-  name              = "/ecs/grafana/GitOps-ECS-Orchestrator"
-  retention_in_days = 7
-}
-
-resource "aws_cloudwatch_log_group" "alb_dynamic_registrar" {
-  name              = "/ecs/grafana/ALBDynamicRegistaar"
   retention_in_days = 7
 }

@@ -19,7 +19,7 @@ data "aws_route53_zone" "fontys_zone" {
   private_zone = false
 
   tags = {
-    Name = "Fontys_Zone"
+    Name = "Fontys Zone"
   }
 }
 
