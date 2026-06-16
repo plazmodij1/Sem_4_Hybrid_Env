@@ -3,7 +3,7 @@ import { UserManager } from "https://esm.sh/oidc-client-ts";
 const API_BASE_URL = "/api"; // Update this to your backend IP/Domain
 
 const cognitoAuthConfig = {
-    cognito_domain: "https://hybrid-cloud-login.auth.eu-central-1.amazoncognito.com",
+    cognito_domain: "https://hybrid-cloud-login-proftask.auth.eu-central-1.amazoncognito.com",
     authority: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_Ej0eZzr2O",
     client_id: "2tactjl76udjqkucb1ooqnb1lr",
     redirect_uri: "http://127.0.0.1:5500/website_frontend/index.html",
