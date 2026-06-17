@@ -270,3 +270,16 @@ resource "aws_cognito_user_pool_domain" "cognito_domain" {
   domain = "hybrid-cloud-login-proftask"
   user_pool_id = aws_cognito_user_pool.website_user_pool.id
 }
+
+resource "aws_cognito_user_pool_client" "cognito_client" {
+  name = "cognito_client"
+  user_pool_id = aws_cognito_user_pool.website_user_pool.id
+
+  allowed_oauth_flows_user_pool_client = true
+  callback_urls = ["https://fontys-proftask.lat/admin/"]
+  logout_urls = ["https://fontys-proftask.lat/admin/"]
+
+  allowed_oauth_flows = ["code"]
+  allowed_oauth_scopes = ["profile", "openid"]
+  supported_identity_providers = ["COGNITO"]
+}

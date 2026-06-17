@@ -4,19 +4,19 @@ const API_BASE_URL = "/api"; // Update this to your backend IP/Domain
 
 const cognitoAuthConfig = {
     cognito_domain: "https://hybrid-cloud-login-proftask.auth.eu-central-1.amazoncognito.com",
-    authority: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_Ej0eZzr2O",
-    client_id: "2tactjl76udjqkucb1ooqnb1lr",
-    redirect_uri: "http://127.0.0.1:5500/website_frontend/index.html",
+    authority: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_KCh4l3WkO",
+    client_id: "4s5l2a5ba6mm2bb8gglbjjfm5f",
+    redirect_uri: "https://fontys-proftask.lat/admin/",
     response_type: "code",
-    scope: "openid profile"
+    scope: "email openid"
 };
 
 const userManager = new UserManager({
-    authority: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_Ej0eZzr2O",
-    client_id: "2tactjl76udjqkucb1ooqnb1lr",
-    redirect_uri: "http://127.0.0.1:5500/website_frontend/index.html",
+    authority: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_KCh4l3WkO",
+    client_id: "4s5l2a5ba6mm2bb8gglbjjfm5f",
+    redirect_uri: "https://fontys-proftask.lat/admin/",
     response_type: "code",
-    scope: "openid profile"
+    scope: "email openid"
 });
 
 // 1. Handle Deploy
@@ -90,6 +90,7 @@ document.getElementById("logoutForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     userManager.removeUser();
     window.location.href = `${cognitoAuthConfig.cognito_domain}/logout?client_id=${cognitoAuthConfig.client_id}&redirect_uri=${encodeURIComponent(cognitoAuthConfig.redirect_uri)}&logout_uri=${cognitoAuthConfig.redirect_uri}&response_type=${cognitoAuthConfig.response_type}&scope=${cognitoAuthConfig.scope}`;
+    
 });
 
 async function updateUi() {
@@ -110,4 +111,6 @@ if (window.location.search.includes("code=")) {
         window.history.replaceState({}, document.title, "/");
         updateUi();
     });
+} else {
+    updateUi();
 }
