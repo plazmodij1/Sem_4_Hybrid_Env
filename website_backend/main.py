@@ -35,7 +35,7 @@ class AdminUpdateRequest(BaseModel):
     updated_parameters: dict
 
 @app.post("/api/deploy") # Ensure this matches your frontend fetch URL!
-async def trigger_deployment(payload: DeployRequest):
+def trigger_deployment(payload: DeployRequest):
     # Enforce basic RBAC
     if payload.role not in ["user", "admin"]:
         raise HTTPException(status_code=403, detail="Unauthorized role.")
@@ -98,8 +98,12 @@ async def trigger_deployment(payload: DeployRequest):
         "branch": "deployments"
     }
 
-    response = requests.put(url, headers=headers, json=data)
-
+    try:
+        response = requests.put(url, headers=headers, json=data, timeout=10)
+    except requests.exceptions.RequestException as e:
+        print(f"Network error reaching GitHub: {e}")
+        raise HTTPException(status_code=500, detail="Cannot reach GitHub API. Check AWS NAT/VPC routing.")
+    
     if response.status_code in [200, 201]:
         return {
             "status": "success", 

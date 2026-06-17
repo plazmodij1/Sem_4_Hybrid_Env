@@ -8,12 +8,12 @@ resource "aws_ecs_task_definition" "backend_task" {
   requires_compatibilities  = ["FARGATE"]
   cpu                       = "256"
   memory                    = "512"
-  task_role_arn = aws_iam_role.ecs_task_role.arn
+  task_role_arn             = aws_iam_role.ecs_task_role.arn
   execution_role_arn        = aws_iam_role.ecs_task_execution.arn
 
   container_definitions = jsonencode([{
     name        = "fastapi-backend-container"
-    image       = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/fastapi-backend"
+    image       = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/fastapi-backend:v3"
     essential   = true
     portMappings = [{
         containerPort   = 8000

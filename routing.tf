@@ -41,19 +41,6 @@ resource "aws_route_table" "private" {
     depends_on = [aws_ec2_transit_gateway.main, aws_ec2_transit_gateway_vpc_attachment.private]
 }
 
-resource "aws_route_table" "nat_public" {
-    vpc_id = aws_vpc.public.id   
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = aws_internet_gateway.igw.id
-    }
-
-    route {
-        cidr_block         = "10.0.0.0/16" 
-        transit_gateway_id = aws_ec2_transit_gateway.main.id
-    }
-}
-
 resource "aws_route_table_association" "public" {
     for_each        = { for k, v in aws_subnet.public : k => v if length(regexall("^tgw", k)) == 0 }
     subnet_id       = each.value.id
@@ -81,7 +68,7 @@ module "fck_nat" {
     vpc_id                          = aws_vpc.public.id
     subnet_id                       = aws_subnet.public["nat-dmz"].id
     instance_type                   = "t3.micro"
-    ha_mode                         = true
 
     additional_security_group_ids = [aws_security_group.fck_nat_custom_ingress.id]
     }
+
