@@ -31,7 +31,10 @@ module "rds" {
     password_wo = "Password1!"
 
     create_db_subnet_group = true
-    subnet_ids = [aws_subnet.private.id[0], aws_subnet.private.id[1]]
+    subnet_ids = [
+        aws_subnet.private["dmz-1"].id,
+        aws_subnet.private["dmz-2"].id
+    ]
 
     vpc_security_group_ids = [aws_security_group.rds_sg.id]
 

@@ -134,21 +134,21 @@ resource "aws_security_group" "ovpn_sg" {
     from_port = 22
     to_port = 22
     protocol = "tcp"
-    cidr_blocks = "0.0.0.0/0"
+    cidr_blocks = ["0.0.0.0/0"]
   }  
 
   ingress {
     from_port = 943
     to_port = 943
     protocol = "tcp"
-    cidr_blocks = "0.0.0.0/0"
+    cidr_blocks = ["0.0.0.0/0"]
   } 
 
   ingress {
     from_port = 1194
     to_port = 1194
     protocol = "udp"
-    cidr_blocks = "0.0.0.0/0"
+    cidr_blocks = ["0.0.0.0/0"]
   } 
 
   egress {
@@ -169,13 +169,13 @@ resource "aws_security_group" "rds_sg" {
     from_port = 5432
     to_port = 5432
     protocol = "tcp"
-    cidr_blocks = "0.0.0.0/0"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   egress {
     from_port = 5432
     to_port = 5432
     protocol = "tcp"
-    cidr_blocks = "0.0.0.0/0"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
