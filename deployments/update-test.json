@@ -6,6 +6,6 @@
   "target_environment": "aws",
   "injected_parameters": {
     "image": "httpd:alpine",
-    "listen_port": "8080"
+    "listen_port": "3333"
   }
 }
