@@ -2,6 +2,10 @@ data "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
 }
 
+data "aws_alb" "alb_url" {
+  name = "main-alb"
+}
+
 data "archive_file" "lambda_zip_orch" {
   type        = "zip"
   source_file  = "${path.module}/lambda_orchestrator/lambda_function.py"
@@ -96,8 +100,4 @@ data "aws_iam_policy_document" "backend_teardown_policy" {
     # Only allows deleting sandbox groups.
     resources = ["arn:aws:elasticloadbalancing:eu-central-1:*:targetgroup/tg-*/*"]
   }
-}
-
-data "aws_alb" "alb_url" {
-  name = "main-alb"
 }
