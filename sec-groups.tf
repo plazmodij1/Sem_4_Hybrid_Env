@@ -124,7 +124,7 @@ resource "aws_security_group" "fck_nat_custom_ingress" {
   }
 }
 
-# Security group for VPN
+## Security group used by the Ovpn Access Server EC2
 resource "aws_security_group" "ovpn_sg" {
   name = "vpn-sg"
   description = "Security group for an EC2 instance hosting the Ovpn Access Server."
@@ -156,5 +156,26 @@ resource "aws_security_group" "ovpn_sg" {
     to_port = 0
     protocol = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+## Security group used by the Postgresql RDS
+resource "aws_security_group" "rds_sg" {
+  name = "rds-sg"
+  description = "Security group for an RDS running Postgresql."
+  vpc_id = aws_vpc.private.id
+
+  ingress {
+    from_port = 5432
+    to_port = 5432
+    protocol = "tcp"
+    cidr_blocks = "0.0.0.0/0"
+  }
+
+  egress {
+    from_port = 5432
+    to_port = 5432
+    protocol = "tcp"
+    cidr_blocks = "0.0.0.0/0"
   }
 }
