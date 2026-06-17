@@ -61,6 +61,10 @@ resource "aws_lb_target_group" "backend_tg" {
   health_check {
     path    = "/docs"
     matcher = "200"
+    interval = 60
+    timeout = 30
+    healthy_threshold = 3
+    unhealthy_threshold = 5
   }
 }
 

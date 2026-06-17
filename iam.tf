@@ -233,13 +233,13 @@ resource "aws_cognito_user_pool" "website_user_pool" {
 resource "aws_cognito_user" "admin_user" {
   username = "admin"
   user_pool_id = aws_cognito_user_pool.website_user_pool.id
-  password = "Password1!" ## CHANGE TO VAR
+  password = "Password1!" 
 }
 
 resource "aws_cognito_user" "guest_user" {
   username = "guest"
   user_pool_id = aws_cognito_user_pool.website_user_pool.id
-  password = "Password1!" ## CHANGE TO VAR
+  password = "Password1!" 
 }
 
 ## Cognito user groups.

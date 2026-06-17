@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, APIRouter
+from fastapi import FastAPI, HTTPException, APIRouter, BackgroundTasks
 from pydantic import BaseModel
 import os
 import json
@@ -231,17 +231,11 @@ async def update_configuration(payload: AdminUpdateRequest):
     else:
         raise HTTPException(status_code=put_response.status_code, detail=put_response.text)
 
-@app.delete("/api/deployments/{container_name}")
-async def delete_container(container_name: str, user_id: str, role: str):
+def execute_background_teardown(container_name: str, user_id: str):
     """
-    Tears down the ALB routing, terminates the ECS container, and deletes the GitOps state file.
+    Executes the long-running AWS and GitHub teardown processes.
+    This runs in a separate thread so the main FastAPI app can answer health checks.
     """
-    # Enforce RBAC (Basic validation)
-    if role not in ["user", "admin"]:
-        raise HTTPException(status_code=403, detail="Unauthorized role.")
-
-
-
     # ==========================================
     # PHASE 1: Network Teardown (ALB & Target Group)
     # ==========================================
@@ -251,50 +245,36 @@ async def delete_container(container_name: str, user_id: str, role: str):
             target_group_arn = None
             rule_arn = None
 
-            print(f"Starting network teardown for: {target_host}")
+            print(f"[Background] Starting network teardown for: {target_host}")
 
-            # 1. Fetch all rules on the Listener
             rules_response = elbv2_client.describe_rules(ListenerArn=alb_listener_arn)
             
-            # 2. Locate the specific rule matching the user's custom hostname
             for rule in rules_response.get('Rules', []):
                 for condition in rule.get('Conditions', []):
                     if condition.get('Field') == 'host-header':
                         if target_host in condition.get('HostHeaderConfig', {}).get('Values', []):
                             rule_arn = rule['RuleArn']
-                            
-                            # Extract the attached Target Group ARN
                             for action in rule.get('Actions', []):
                                 if action.get('Type') == 'forward':
                                     target_group_arn = action.get('TargetGroupArn')
                                     break
 
-            # 3. Delete the Listener Rule FIRST
             if rule_arn:
-                print(f"Deleting ALB Rule: {rule_arn}")
+                print(f"[Background] Deleting ALB Rule: {rule_arn}")
                 elbv2_client.delete_rule(RuleArn=rule_arn)
-            else:
-                print(f"Warning: No ALB Rule found for {target_host}")
 
-            # 4. Delete the Target Group SECOND
             if target_group_arn:
-                print(f"Deleting Target Group: {target_group_arn}")
+                print(f"[Background] Deleting Target Group: {target_group_arn}")
                 elbv2_client.delete_target_group(TargetGroupArn=target_group_arn)
-            else:
-                print(f"Warning: No Target Group found attached to rule.")
-        else:
-            print("Warning: ALB_LISTENER_ARN is not set. Skipping network teardown.")
 
     except Exception as e:
-        # Catch network errors but do not block the compute/state teardown
-        print(f"ALB Teardown Error: {str(e)}")
+        print(f"[Background] ALB Teardown Error: {str(e)}")
 
 
     # ==========================================
     # PHASE 2: Terminate Compute (AWS ECS)
     # ==========================================
     try:
-        # 1. Bypass the SCP: Get all running tasks natively from your ECS cluster
         paginator = ecs_client.get_paginator('list_tasks')
         all_task_arns = []
         for page in paginator.paginate(cluster=cluster_name, desiredStatus='RUNNING'):
@@ -302,20 +282,13 @@ async def delete_container(container_name: str, user_id: str, role: str):
 
         target_task_arn = None
 
-        # 2. Describe tasks in batches to read their tags internally
         if all_task_arns:
             for i in range(0, len(all_task_arns), 100):
                 batch = all_task_arns[i:i+100]
-                describe_response = ecs_client.describe_tasks(
-                    cluster=cluster_name,
-                    tasks=batch,
-                    include=['TAGS']
-                )
+                describe_response = ecs_client.describe_tasks(cluster=cluster_name, tasks=batch, include=['TAGS'])
 
                 for task in describe_response.get('tasks', []):
                     tags = {tag['key']: tag['value'] for tag in task.get('tags', [])}
-                    
-                    # 3. Match the tags
                     if tags.get('ContainerName') == container_name and tags.get('Owner') == user_id:
                         target_task_arn = task['taskArn']
                         break
@@ -323,54 +296,71 @@ async def delete_container(container_name: str, user_id: str, role: str):
                 if target_task_arn:
                     break
 
-        # 4. Execute the kill command
         if target_task_arn:
             ecs_client.stop_task(
                 cluster=cluster_name,
                 task=target_task_arn,
                 reason="User requested deletion via self-service portal"
             )
-            print(f"Terminating ECS Task: {target_task_arn}")
+            print(f"[Background] Terminating ECS Task: {target_task_arn}")
         else:
-            print(f"Warning: No running task found for '{container_name}'")
+            print(f"[Background] Warning: No running task found for '{container_name}'")
 
     except Exception as e:
-        print(f"ECS Termination Error: {str(e)}")
+        print(f"[Background] ECS Termination Error: {str(e)}")
 
 
     # ==========================================
     # PHASE 3: Clean State (GitHub GitOps)
     # ==========================================
-    file_path = f"deployments/{container_name}.json"
-    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
-    
-    headers = {
-        "Authorization": f"Bearer {github_token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-
-    # Step A: Fetch the file to get its mandatory 'sha' hash
-    get_url = f"{url}?ref=deployments"
-    get_response = requests.get(get_url, headers=headers)
-    
-    if get_response.status_code != 200:
-        raise HTTPException(status_code=404, detail=f"GitOps state for '{container_name}' not found.")
-    
-    file_sha = get_response.json()["sha"]
-
-    # Step B: Execute the Delete request to GitHub
-    delete_data = {
-        "message": f"GitOps Teardown: {user_id} deleted {container_name}",
-        "sha": file_sha,
-        "branch": "deployments"
-    }
-
-    delete_response = requests.delete(url, headers=headers, json=delete_data)
-
-    if delete_response.status_code in [200, 201]:
-        return {
-            "status": "success", 
-            "message": f"Container '{container_name}' terminated and state removed from GitOps pipeline."
+    try:
+        file_path = f"deployments/{container_name}.json"
+        url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
+        
+        headers = {
+            "Authorization": f"Bearer {github_token}",
+            "Accept": "application/vnd.github.v3+json"
         }
-    else:
-        raise HTTPException(status_code=delete_response.status_code, detail=delete_response.text)
+
+        get_url = f"{url}?ref=deployments"
+        get_response = requests.get(get_url, headers=headers)
+        
+        if get_response.status_code == 200:
+            file_sha = get_response.json()["sha"]
+
+            delete_data = {
+                "message": f"GitOps Teardown: {user_id} deleted {container_name}",
+                "sha": file_sha,
+                "branch": "deployments"
+            }
+
+            delete_response = requests.delete(url, headers=headers, json=delete_data)
+            if delete_response.status_code in [200, 201]:
+                print(f"[Background] State removed from GitOps pipeline for '{container_name}'.")
+            else:
+                print(f"[Background] GitHub Delete Failed: {delete_response.text}")
+        else:
+            print(f"[Background] GitOps state for '{container_name}' not found. Status: {get_response.status_code}")
+            
+    except Exception as e:
+         print(f"[Background] GitHub GitOps Clean Error: {str(e)}")
+
+
+@app.delete("/api/deployments/{container_name}")
+async def delete_container(container_name: str, user_id: str, role: str, background_tasks: BackgroundTasks):
+    """
+    Tears down the ALB routing, terminates the ECS container, and deletes the GitOps state file.
+    Runs asynchronously to prevent ALB health check failures.
+    """
+    # Enforce RBAC (Basic validation)
+    if role not in ["user", "admin"]:
+        raise HTTPException(status_code=403, detail="Unauthorized role.")
+
+    # 1. Queue the heavy lifting to run in the background
+    background_tasks.add_task(execute_background_teardown, container_name, user_id)
+
+    # 2. Instantly return to the frontend and the ALB
+    return {
+        "status": "Accepted", 
+        "message": f"Teardown process for '{container_name}' initiated in the background."
+    }
