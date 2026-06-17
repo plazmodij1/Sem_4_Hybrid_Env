@@ -13,7 +13,7 @@ resource "aws_ecs_task_definition" "backend_task" {
 
   container_definitions = jsonencode([{
     name        = "fastapi-backend-container"
-    image       = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/fastapi-backend:v3"
+    image       = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/fastapi-backend:v5"
     essential   = true
     portMappings = [{
         containerPort   = 8000

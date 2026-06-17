@@ -34,6 +34,7 @@ class AdminUpdateRequest(BaseModel):
     container_name: str
     updated_parameters: dict
 
+print("This is a debugging test")
 @app.post("/api/deploy") # Ensure this matches your frontend fetch URL!
 def trigger_deployment(payload: DeployRequest):
     # Enforce basic RBAC
@@ -113,38 +114,21 @@ def trigger_deployment(payload: DeployRequest):
     else:
         raise HTTPException(status_code=response.status_code, detail=response.text)
 
-@app.put("/api/config/update")
-async def update_configuration(payload: AdminUpdateRequest):
-    # 1. Enforce RBAC based on the payload (Payload-based trust)
-    if payload.role.lower() != "admin":
-        raise HTTPException(status_code=403, detail="Admin privileges required.")
-
-    file_path = f"deployments/{payload.container_name}.json"
-    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
-
-    get_url = f"{url}?ref=deployments"
-
-    headers = {
-        "Authorization": f"Bearer {github_token}",
-        "Accept": "application/vnd.github.v3+json"
-    }
-    
+def execute_background_update(payload, file_data, url, headers):
     container_name = payload.container_name
+    print(f"[Update Workflow] Background task started for {container_name}", flush=True)
 
-
-
-    # ==========================================================
-    # STEP 1: PRE-UPDATE CLEANUP (Wipe old network & compute)
-    # ==========================================================
+    # --- STEP 1: WIPE OLD NETWORKING ---
     try:
         if alb_listener_arn:
             target_host = f"{container_name}.{domain_suffix}"
+            
+            # Initialize variables to prevent UnboundLocalError
             target_group_arn = None
             rule_arn = None
 
-            print(f"[Update Workflow] Clearing out old networking for: {target_host}")
+            print(f"[Update Workflow] Clearing out old networking for: {target_host}", flush=True)
 
-            # Find the existing ALB rule matching this host header
             rules_response = elbv2_client.describe_rules(ListenerArn=alb_listener_arn)
             for rule in rules_response.get('Rules', []):
                 for condition in rule.get('Conditions', []):
@@ -156,24 +140,21 @@ async def update_configuration(payload: AdminUpdateRequest):
                                     target_group_arn = action.get('TargetGroupArn')
                                     break
 
-            # Delete old rule
             if rule_arn:
-                print(f"[Update Workflow] Deleting old ALB Rule: {rule_arn}")
+                print(f"[Update Workflow] Deleting old ALB Rule: {rule_arn}", flush=True)
                 elbv2_client.delete_rule(RuleArn=rule_arn)
-                import time
-                time.sleep(1) # Give AWS a brief window to process dissociation
+                time.sleep(1) # Brief window to process dissociation
 
-            # Delete old target group
             if target_group_arn:
-                print(f"[Update Workflow] Deleting old Target Group: {target_group_arn}")
+                print(f"[Update Workflow] Deleting old Target Group: {target_group_arn}", flush=True)
                 elbv2_client.delete_target_group(TargetGroupArn=target_group_arn)
 
     except Exception as e:
-        print(f"[Update Workflow] Warning during network cleanup: {str(e)}")
+        print(f"[Update Workflow] Warning during network cleanup: {str(e)}", flush=True)
 
+    # --- STEP 2: WIPE OLD COMPUTE ---
     try:
-        # Find and terminate the old running ECS task
-        print(f"[Update Workflow] Finding active container instance for '{container_name}' to terminate...")
+        print(f"[Update Workflow] Finding active container instance for '{container_name}'...", flush=True)
         paginator = ecs_client.get_paginator('list_tasks')
         all_task_arns = []
         for page in paginator.paginate(cluster=cluster_name, desiredStatus='RUNNING'):
@@ -187,7 +168,7 @@ async def update_configuration(payload: AdminUpdateRequest):
                 for task in describe_response.get('tasks', []):
                     tags = {tag['key']: tag['value'] for tag in task.get('tags', [])}
                     if tags.get('ContainerName') == container_name:
-                        print(f"[Update Workflow] Terminating old ECS Task: {task['taskArn']}")
+                        print(f"[Update Workflow] Terminating old ECS Task: {task['taskArn']}", flush=True)
                         ecs_client.stop_task(
                             cluster=cluster_name,
                             task=task['taskArn'],
@@ -195,45 +176,72 @@ async def update_configuration(payload: AdminUpdateRequest):
                         )
                         break
     except Exception as e:
-        print(f"[Update Workflow] Warning during compute termination: {str(e)}")
+        print(f"[Update Workflow] Warning during compute termination: {str(e)}", flush=True)
 
-    # 2. Fetch the current configuration from GitHub
-    get_response = requests.get(get_url, headers=headers)
+    # --- STEP 3: PUSH TO GITHUB ---
+    try:
+        file_sha = file_data["sha"] 
+        current_content_str = base64.b64decode(file_data["content"]).decode("utf-8")
+        current_config = json.loads(current_content_str)
+
+        if "injected_parameters" not in current_config:
+            current_config["injected_parameters"] = {}
+            
+        current_config["injected_parameters"].update(payload.updated_parameters)
+        updated_json_str = json.dumps(current_config, indent=2)
+
+        put_data = {
+            "message": f"GitOps Admin Trigger: {payload.user_id} updated {payload.container_name}",
+            "content": base64.b64encode(updated_json_str.encode("utf-8")).decode("utf-8"),
+            "branch": "deployments",
+            "sha": file_sha 
+        }
+
+        # Added a strict timeout so this never hangs the background thread either!
+        put_response = requests.put(url, headers=headers, json=put_data, timeout=10)
+
+        if put_response.status_code in [200, 201]:
+            print(f"[Update Workflow] Success! GitOps update committed for {container_name}.", flush=True)
+        else:
+            print(f"[Update Workflow] Git Push Failed: {put_response.text}", flush=True)
+            
+    except Exception as e:
+        print(f"[Update Workflow] Warning during GitHub commit: {str(e)}", flush=True)
+
+@app.put("/api/config/update")
+async def update_configuration(payload: AdminUpdateRequest, background_tasks: BackgroundTasks):
+    
+    file_path = f"deployments/{payload.container_name}.json"
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{file_path}"
+    get_url = f"{url}?ref=deployments"
+
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    
+    # 1. Quick Synchronous Validation
+    try:
+        get_response = requests.get(get_url, headers=headers, timeout=10)
+    except requests.exceptions.RequestException:
+        raise HTTPException(status_code=500, detail="Timeout while trying to validate configuration with GitHub.")
+
     if get_response.status_code != 200:
         raise HTTPException(status_code=404, detail=f"Configuration for '{payload.container_name}' not found.")
 
     file_data = get_response.json()
-    file_sha = file_data["sha"] # Required by GitHub to authorize an update
-    
-    # Decode existing content
-    current_content_str = base64.b64decode(file_data["content"]).decode("utf-8")
-    current_config = json.loads(current_content_str)
 
-    # 3. Merge the new parameters into the existing injected_parameters
-    if "injected_parameters" not in current_config:
-        current_config["injected_parameters"] = {}
-        
-    current_config["injected_parameters"].update(payload.updated_parameters)
-    
-    updated_json_str = json.dumps(current_config, indent=2)
+    # 2. Handoff to Background Worker
+    background_tasks.add_task(
+        execute_background_update, 
+        payload, file_data, url, headers
+    )
 
-    # 4. Push the new commit back to GitHub
-    put_data = {
-        "message": f"GitOps Admin Trigger: {payload.user_id} updated {payload.container_name}",
-        "content": base64.b64encode(updated_json_str.encode("utf-8")).decode("utf-8"),
-        "branch": "deployments",
-        "sha": file_sha 
+    # 3. Return instantly so the browser and ALB don't time out
+    return {
+        "status": "processing", 
+        "message": f"Configuration update initiated for {payload.container_name}. Infrastructure is recycling."
     }
-
-    put_response = requests.put(url, headers=headers, json=put_data)
-
-    if put_response.status_code in [200, 201]:
-        return {
-            "status": "success", 
-            "message": f"Configuration for {payload.container_name} updated successfully in Git."
-        }
-    else:
-        raise HTTPException(status_code=put_response.status_code, detail=put_response.text)
 
 def execute_background_teardown(container_name: str, user_id: str):
     """

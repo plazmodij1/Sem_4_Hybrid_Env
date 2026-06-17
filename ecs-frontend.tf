@@ -87,7 +87,7 @@ resource "aws_ecs_task_definition" "admin_frontend" {
 
   container_definitions = jsonencode([{
     name = "admin-panel"
-    image = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/hybrid-admin-frontend" #change this for the proftask project
+    image = "318270725890.dkr.ecr.eu-central-1.amazonaws.com/hybrid-admin-frontend:v13" #change this for the proftask project
     essential = true
     portMappings = [{
       containerPort = 80
