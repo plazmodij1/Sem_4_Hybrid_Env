@@ -32,8 +32,8 @@ module "rds" {
 
     create_db_subnet_group = true
     subnet_ids = [
-        aws_subnet.private["dmz-1"].id,
-        aws_subnet.private["dmz-2"].id
+        aws_subnet.private["data-1"].id,
+        aws_subnet.private["data-2"].id
     ]
 
     vpc_security_group_ids = [aws_security_group.rds_sg.id]

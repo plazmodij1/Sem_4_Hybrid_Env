@@ -6,7 +6,7 @@ module "ovpn_ec2" {
     instance_type = "t3.medium"
     ami = data.aws_ami.ovpn_ami.id
 
-    subnet_id = aws_subnet.public["data-1"].id
+    subnet_id = aws_subnet.public["dmz-1"].id
     associate_public_ip_address = true
 
     create_security_group = false
